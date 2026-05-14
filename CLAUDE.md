@@ -8,7 +8,7 @@ Project guide for Claude Code. Read this first.
 
 Train a binary classifier (signal vs background) on H→ZZ→4μ events using
 Monte Carlo samples at √s = 13.6 TeV. Input samples are NanoAOD-style ROOT
-files produced by the companion [madgraph](https://github.com/Siun-Kim/madgraph)
+files produced by the companion [madgraph](https://github.com/siunkim0/madgraph)
 pipeline (MadGraph5 + Pythia8 + Delphes).
 
 ## Phases
