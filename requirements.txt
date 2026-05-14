@@ -1,0 +1,24 @@
+# Core data handling
+uproot>=5.3
+awkward>=2.6
+numpy>=1.26
+pandas>=2.2
+pyarrow>=15.0           # parquet I/O
+
+# ML
+scikit-learn>=1.4
+xgboost>=2.0            # 2.0+ has the cleaner device='cuda' API
+
+# Plotting
+matplotlib>=3.8
+mplhep>=0.3             # CMS-style plots
+
+# Config / misc
+PyYAML>=6.0
+tqdm>=4.66
+vector>=1.4             # Lorentz vector arithmetic on awkward arrays
+
+# Optional: install only if you want them
+# jupyter>=1.0
+# onnxmltools>=1.12      # for later ONNX export
+# onnxruntime>=1.17

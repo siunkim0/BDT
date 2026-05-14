@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data — never commit
+data/ntuples/*.parquet
+data/models/*.json
+data/models/*.onnx
+data/models/*.csv
+data/models/*.txt
+*.root
+
+# Outputs (CMS-derived plots/results — restricted for publishing)
+plots/
+plots/**
+notebooks/plots/
+notebooks/plots/**
+logs/*.log
+reports/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store

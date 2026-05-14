@@ -1,0 +1,56 @@
+# Event selection and BDT training configuration
+
+triggers:
+  - HLT_TripleMu_10_5_5_DZ
+  - HLT_TripleMu_12_10_5
+  - HLT_DoubleMu4_3_LowMass
+  - HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_Mass3p8
+
+muon:
+  pt_lead:        20.0     # GeV
+  pt_sublead:     10.0
+  pt_other:        5.0
+  eta_max:         2.4
+  iso_max:         0.35    # PF relIso (R=0.4), loose for HZZ
+  dxy_max:         0.5     # cm
+  dz_max:          1.0
+  sip3d_max:       4.0
+  id:              "loose" # NanoAOD branch: Muon_looseId
+
+z_pairing:
+  mZ1_min:        40.0     # GeV
+  mZ1_max:       120.0
+  mZ2_min:        12.0
+  mZ2_max:       120.0
+
+four_lepton:
+  m4l_min:        70.0     # training window
+  m4l_max:      1000.0
+  charge_sum:        0     # opposite-sign quartet
+
+# BDT hyperparameters — start conservative, tune later.
+bdt:
+  n_estimators:    3000
+  max_depth:         2
+  learning_rate:     0.05
+  subsample:         0.8
+  colsample_bytree:  0.8
+  min_child_weight:  20
+  reg_alpha:         0.0
+  reg_lambda:        1.0
+  early_stopping_rounds: 50
+  eval_metric:    "auc"
+
+train:
+  test_size:       0.25    # fraction held out for evaluation
+  val_size:        0.15    # fraction of train used for early-stopping
+  seed:              42
+  use_gpu:        true     # set false to force CPU
+  # Planing: per-class m4l reweighting so each class has a flat m4l shape
+  # at training time. With this on, the BDT cannot exploit m4l for
+  # classification — see src/train.py::apply_planing.
+  planing:
+    enabled:      false
+    m4l_col:      "m4l"
+    n_bins:        50
+    m4l_range:    [70, 250]   # GeV

@@ -1,0 +1,46 @@
+# Run3 2022 postEE samples
+# Fill in `path:` with the actual location of the NanoAOD files on your server.
+# Use a glob pattern (e.g. /path/to/dir/*.root) — uproot accepts this directly.
+# `das:` is informational only; replace with the appropriate dataset identifier
+# for your environment (or leave as FILL_ME).
+
+era: "2022postEE"
+lumi_fb: 26.7              # integrated luminosity, fb^-1
+golden_json: "FILL_ME"     # path to Cert_Collisions2022_355100_362760_Golden.json
+
+signal:
+  ggH_ZZ_4l:
+    das: "FILL_ME"
+    path: "FILL_ME"        # glob pattern to NanoAOD .root files
+    xsec: 0.00637          # pb, σ(ggH) × BR(H→ZZ→4l)
+    label: 1               # signal class
+
+background:
+  qqZZ_4l:
+    das: "FILL_ME"
+    path: "FILL_ME"
+    xsec: 1.39             # pb
+    label: 0
+
+  DY_M50:
+    das: "FILL_ME"
+    path: "FILL_ME"
+    xsec: 6225.0           # pb (inclusive M>50)
+    label: 0
+
+  TTto2L2Nu:
+    das: "FILL_ME"
+    path: "FILL_ME"
+    xsec: 98.04            # pb
+    label: 0
+
+data:
+  Muon_2022E:
+    das: "FILL_ME"
+    path: "FILL_ME"
+  Muon_2022F:
+    das: "FILL_ME"
+    path: "FILL_ME"
+  Muon_2022G:
+    das: "FILL_ME"
+    path: "FILL_ME"
