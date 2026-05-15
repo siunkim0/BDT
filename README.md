@@ -439,3 +439,8 @@ The export script (`scripts/export_onnx.py`) converts the model, strips the ZipM
 - **LO cross sections** — all samples are generated at leading order.
 
 ---
+
+## Author
+
+**Siun Kim**
+Department of Physics, Sungkyunkwan University
