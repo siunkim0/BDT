@@ -185,6 +185,223 @@ Use a new model name (`--out data/models/bdt_v2.json`) when iterating to preserv
 
 ---
 
+## Iteration History
+
+The current 17-feature input set is the result of four iterations addressing the question of how the BDT score should be constructed relative to the Higgs mass peak. The history is documented here because each iteration produced a methodological observation that motivated the next.
+
+| Iter. | Strategy | AUC | \|r(score, m₄ℓ)\| | Outcome |
+|-------|----------|-----|-------------------|---------|
+| **v1** | Full feature set (22 vars, mass included) | 0.992 | 0.99 | Mass-window cut learned implicitly |
+| **v2** | Mass-related features removed (17 vars) | 0.935 | 0.55 | Partial decorrelation; **current default** |
+| **v3** | Per-class planing of m₄ℓ distribution | 0.81 | **0.73** | Decorrelation worsened; failure analyzed |
+| **Path 1** | SR-restricted training (m₄ℓ ∈ [105, 140] GeV) | TBD | TBD | In progress |
+
+The principal finding is that per-class planing fails for narrow-resonance signals when implemented with per-class weight normalization, due to weight extrapolation in regions of zero signal support. The Path 1 approach (signal-region pre-selection followed by in-region training) is consistent with the standard CMS H→ZZ→4ℓ workflow.
+
+### v1 — Full feature set
+
+An XGBoost classifier was trained with max_depth = 2, learning_rate = 0.05, and early stopping after 30 rounds without validation improvement. The full 22-feature set was used, including m₄ℓ, m_{Z₁}, and m_{Z₂}. Class weights were rescaled such that Σw_signal = Σw_background. The training set was split 65/10/25 between train/validation/test, stratified by class.
+
+**Performance.**
+
+| Metric | Value |
+|--------|-------|
+| Test AUC (held-out) | 0.992 |
+| 5-fold CV AUC | 0.9901 ± 0.0037 |
+| Top feature (by gain) | m4l |
+| r(score, m₄ℓ), background | −0.99 |
+
+The five highest-gain features were m4l, mZ1, mZ2, pt_Z2, and pt_mu1, in descending order. The mass observables dominated the gain budget by a factor of approximately three over the next group of variables.
+
+**Tree-level analysis.**
+
+Inspection of the first boosted tree revealed that all three internal nodes split exclusively on m₄ℓ:
+
+```
+                  [m₄ℓ < 129.5]
+                /              \
+       [m₄ℓ < 116.5]      [m₄ℓ < 132.9]
+        /        \            /        \
+    -0.078    +0.088     -0.065     -0.101
+```
+
+The structure corresponds to an asymmetric mass window. Only the interval 116.5 ≤ m₄ℓ < 129.5 GeV receives a positive leaf contribution. The asymmetry around the nominal m_H = 125 GeV (window extending 8.5 GeV below and 4.5 GeV above) is consistent with the FSR-induced low-mass tail of the H→ZZ→4μ signal.
+
+Subsequent trees in the early boosting iterations continued to feature m₄ℓ at the root or first split. Non-mass variables (e.g., p_T(μ₃), m_{Z₂}) appeared at the root only after iteration ~100, when the residual loss in the m₄ℓ peak region had been substantially reduced.
+
+**Discussion.**
+
+The Pearson correlation r(BDT score, m₄ℓ) = −0.99 in background indicates that the BDT score is, for practical purposes, a function of m₄ℓ. This behavior is incompatible with downstream signal extraction by mass fitting, which is the standard procedure for H→ZZ→4ℓ. A score-based event categorization would deform the background m₄ℓ distribution in a manner that mimics the signal peak, biasing the fitted signal yield.
+
+It was concluded that AUC alone is insufficient as a model-quality criterion, and that direct inspection of the learned representation — through tree visualization, feature importance ranking, and score-vs-observable correlation studies — is essential when the downstream analysis depends on a particular factorization of information.
+
+### v2 — Mass-feature removal (current default)
+
+The following features were removed from the input set:
+
+```python
+"m4l", "mZ1", "mZ2",                    # direct mass observables
+"pt_Z1_over_m4l", "pt_Z2_over_m4l",     # m4l in denominator
+"dR_Z1Z2",                              # mass-phase-space dependent
+```
+
+Seventeen features remained: the four-lepton system p_T and η; the Z-candidate transverse momenta; per-lepton p_T and η; and the five helicity angles. This is the feature set documented in the [Features](#features) section below. Training hyperparameters were unchanged from v1.
+
+**Performance.**
+
+| Metric | v1 | v2 |
+|--------|----|----|
+| Test AUC | 0.992 | 0.935 |
+| 5-fold CV AUC | 0.9901 ± 0.0037 | 0.9347 ± 0.019 |
+| r(score, m₄ℓ), background | −0.99 | **−0.55** |
+| Top feature (by gain) | m4l | Phi |
+
+The mass-score correlation reduced by a factor of approximately 1.8, but the target |r| < 0.1 was not achieved. The AUC reduction of six percentage points reflects the loss of direct access to the strongest single discriminator.
+
+**Source of residual correlation.**
+
+The residual correlation arises because the seventeen retained features are not statistically independent of m₄ℓ. The relevant kinematic relations are summarized below:
+
+| Feature group | Mechanism | Strength |
+|---------------|-----------|----------|
+| p_T(μ_i) | E_μ ≈ m_Z/2 in H rest frame; lab p_T depends on H boost | moderate |
+| p_T(Z₁), p_T(Z₂) | \|p_Z\| in H frame is a function of m₄ℓ, m_{Z₁}, m_{Z₂} | moderate |
+| Helicity angles | Boost-invariant by construction; weak residual via reconstruction | weak |
+| p_T(4ℓ) | Determined by production kinematics, weakly mass-dependent | weak |
+| η(μ_i), η(4ℓ) | Geometric, near-independent of m₄ℓ | very weak |
+
+The classifier exploits the moderate-strength variables to partially reconstruct the m₄ℓ information that was nominally removed. Each individual variable provides only a fraction of the discrimination available from m₄ℓ itself, but their combination yields the |r| ≈ 0.55 observed.
+
+**Yield reduction at tight working points.**
+
+At a tight BDT-score selection (score > 0.9), the surviving signal yield in the 124–126 GeV bin was reduced by approximately two orders of magnitude relative to v1. The reduced bimodality of the v2 score distribution makes the score > 0.9 cut more aggressive in absolute terms, shifting both signal efficiency and background rejection toward stricter values. Signal events suffer proportionally larger losses.
+
+**Discussion.**
+
+It was concluded that input-space modification by feature removal is an inadequate decorrelation strategy for this analysis configuration. Two factors contribute. First, the kinematic input variables exhibit non-trivial joint dependence on m₄ℓ through the H→ZZ→4μ decay topology; complete decoupling would require removal of essentially all p_T-based observables, leaving only the helicity angles. Second, the reduced discrimination capacity shifts the score distribution toward less-bimodal forms, reducing signal efficiency at any fixed working point. These limitations motivated examination of weight-based decorrelation in v3.
+
+v2 was retained as the current default model because the AUC trade-off was considered acceptable for the learning-project objectives, and because v3 (planing) was subsequently shown to perform worse.
+
+### v3 — Per-class planing
+
+**Method.**
+
+Planing (Chang, Cohen, Ostdiek, [arXiv:1709.10106](https://arxiv.org/abs/1709.10106)) reweights training events such that the distribution of a chosen observable becomes flat. A per-class formulation was adopted: signal and background events were independently reweighted such that each class exhibits a flat m₄ℓ distribution at training time.
+
+```python
+def apply_planing(df, m4l_col='m4l', n_bins=50, m4l_range=(70, 250)):
+    df = df.copy()
+    df['planed_weight'] = 0.0
+    edges = np.linspace(m4l_range[0], m4l_range[1], n_bins + 1)
+
+    for label in [0, 1]:
+        mask = (df['label'] == label)
+        m4l_vals = df.loc[mask, m4l_col].to_numpy()
+        weights  = df.loc[mask, 'xsec_weight'].to_numpy()
+
+        hist, _ = np.histogram(m4l_vals, bins=edges, weights=weights)
+        bin_idx = np.clip(np.digitize(m4l_vals, edges) - 1, 0, n_bins - 1)
+        local_density = hist[bin_idx]
+
+        planed = weights / np.maximum(local_density, 1e-6)
+        planed = planed / planed.sum()           # per-class normalization
+        df.loc[mask, 'planed_weight'] = planed
+    return df
+```
+
+The full mass-feature set was restored under the assumption that planing would render direct access to m₄ℓ uninformative for classification.
+
+**Performance.**
+
+| Metric | v1 | v2 | **v3** |
+|--------|----|----|--------|
+| Test AUC | 0.992 | 0.935 | **0.81** |
+| r(score, m₄ℓ), background | −0.99 | −0.55 | **−0.73** |
+| Top feature (by gain) | m4l | Phi | **m4l** |
+
+The mass-score correlation increased relative to v2, exceeding even the reduced feature set. The model assigned the largest gain to m₄ℓ despite the intent of the procedure.
+
+**Diagnosis.**
+
+A planing-validation plot was generated prior to training, showing the m₄ℓ distribution before and after reweighting for both classes:
+
+| Class | Before planing | After planing |
+|-------|----------------|---------------|
+| Signal | Sharp peak at 125 GeV | Flat within [70, 150] GeV; **isolated spikes near 170 and 195 GeV** |
+| Background | Broad distribution peaking at 90 GeV (DY) | Flat (CV across populated bins ≈ 0.02) |
+
+Background planing performed as expected. The signal planed distribution exhibited two pathological features:
+
+1. **Truncation above m₄ℓ ≈ 150 GeV.** The ggH simulation does not populate this region appreciably, and bins with zero weighted yield receive no planing correction.
+2. **Isolated high-weight spikes** in bins containing one or two outlier signal events. These events are assigned weights inflated by a factor of approximately 10⁴ during the per-bin density division.
+
+After per-class normalization (Σw = 1 within each class), the resulting local signal-to-background ratio becomes:
+
+| m₄ℓ region | Σw_signal / Σw_background |
+|------------|---------------------------|
+| ~125 GeV | ~6 |
+| ~200 GeV | ~0 |
+
+The condition "S/B = 0 for m₄ℓ > 150 GeV" is the highest-purity discrimination signal available to the classifier. The BDT learns this preferentially over any subtler kinematic structure, and assigns large gain to m₄ℓ to construct the corresponding decision boundary.
+
+The decorrelation procedure has thus actively constructed a binary mass-region indicator (events present / events absent in the planed training set), which the model treats as the dominant feature. This is the opposite of the intended outcome.
+
+**Comparison with successful applications.**
+
+The CMS H± → cs analysis ([arXiv:2604.27795](https://arxiv.org/abs/2604.27795)) employed a comparable reweighting strategy with apparent success. The relevant configuration difference is the use of multiple signal mass hypotheses:
+
+> "All signal mass points (40–70 GeV and 80–160 GeV) are combined for the low- and high-mass sets of training, respectively."
+
+By combining mass points at 10 GeV intervals into the training set, that analysis produces a wide signal m_jj distribution covering the relevant background range. Per-class planing then operates on comparable signal and background supports, and the empty-region pathology observed in the present work does not arise.
+
+| | arXiv:2604.27795 | This work |
+|---|------------------|-----------|
+| Signal m support | 40–160 GeV (combined) | 125 ± 2 GeV |
+| Background m support | W peak (80 GeV) | continuum |
+| Class supports comparable | yes | no |
+| Per-class planing applicable | yes | **no** |
+
+**Discussion.**
+
+It was concluded that per-class planing, as conventionally formulated, is inappropriate for single-narrow-resonance searches. The failure mode is generic: any reweighting strategy that requires comparable signal and background support over the planing observable will encounter equivalent problems on samples with single-mass-point signal models.
+
+Two general lessons were drawn. First, standard decorrelation techniques carry implicit assumptions about sample geometry; direct application to narrow-resonance searches requires either signal-sample augmentation across multiple mass points (as in arXiv:2604.27795), or an alternative formulation that does not normalize the classes independently. Second, sanity-check plots prior to training are essential — the diagnosis above relied on inspection of the planed weight distribution before training, which post-training metrics alone would not have provided.
+
+### Path 1 — Signal-region-restricted training (in progress)
+
+The intended approach for the next iteration follows the standard CMS H→ZZ→4ℓ workflow:
+
+1. A signal-region pre-selection is applied (m₄ℓ ∈ [105, 140] GeV).
+2. The BDT is trained on events surviving this cut, with the full feature set (including mass variables) restored.
+3. Events are categorized by BDT score (loose, medium, tight working points).
+4. The signal yield is extracted by fitting the m₄ℓ distribution within each category.
+
+Within the restricted m₄ℓ window, sculpting risk is reduced by construction: the kinematic phase space available to both classes is comparable, and residual m₄ℓ structure within the window is what the downstream mass fit explicitly resolves. The BDT is required only to classify within the SR, which is the discrimination problem of physical interest.
+
+Results will be added upon completion.
+
+---
+
+## Lessons Learned
+
+The four iterations support the following observations.
+
+**On model-quality assessment.** AUC, in isolation, is inadequate as a model-quality criterion when the downstream analysis depends on a particular factorization of information. For BDT discriminants intended to combine with mass-fit signal extraction, the relevant quality criterion includes both classification performance and score-mass independence. The latter is not implied by the former.
+
+**On feature removal.** Naive decorrelation by removing input variables that explicitly reference the target observable produces only partial correlation reduction. Residual correlation arises from kinematic dependence among the surviving input variables; in narrow-resonance topologies, complete decoupling typically requires removal of essentially all kinematic features, with severe loss of discrimination capacity.
+
+**On per-class planing.** The procedure fails when class supports differ substantially over the planing observable. Per-class normalization constructs a trivially-discriminating region-presence indicator that the classifier learns preferentially. The CMS B2G-23-003 charged-Higgs analysis applies a similar reweighting strategy successfully, but does so on training samples combining multiple signal mass hypotheses, in which case signal and background have comparable support. Direct transfer of the planing methodology to single-mass-point analyses without adapting the procedure is unsound.
+
+**On the standard analysis workflow.** The CMS H→ZZ→4ℓ measurement workflow (signal-region pre-selection followed by in-region BDT training and per-category mass fitting) is well-motivated by the failure modes documented above. Specifically, pre-selection restricts the m₄ℓ phase space available to both classes, reducing the lever arm for sculpting by construction. The full feature set, including m₄ℓ itself, can be retained in training without inducing the v1 sculpting, because the residual m₄ℓ structure within the SR is what the downstream mass fit explicitly resolves.
+
+**On diagnostic plotting.** Diagnostic plots prior to training are essential in any decorrelation procedure that involves event reweighting. The weighted training distributions should be inspected before training. The incremental cost is negligible relative to the cost of training and debugging a failed model.
+
+**On boosted decision tree behavior.** Configurations with max_depth = 2 and large n_estimators consistently outperformed those with deeper trees, consistent with the boosting-literature expectation that shallow trees provide a more fine-grained additive correction structure. Cross-validation variance on single splits was found to exceed typical hyperparameter-tuning sensitivity, motivating the use of k-fold CV for any quantitative hyperparameter comparison. Training cost was sufficiently low (order of seconds for the dataset size considered) to place hyperparameter scans, cross-validation, and ablation studies within reach of interactive workflows.
+
+**On broader applicability.** The v1 sculpting pattern, the v2 leakage-through-correlated-features pattern, and the v3 planing-failure pattern are not specific to H→ZZ→4μ. They are expected to recur in any narrow-resonance search with similar sample structure: H→γγ, H→bb (resonant), low-mass dilepton resonances, and BSM scalar searches with single-mass-point signal models. The mitigation strategy of Path 1 (SR-restricted training) is correspondingly general. For BSM searches with multi-mass-point signal samples, the v3 failure mode is mitigated by the same mechanism that allows arXiv:2604.27795 to apply planing successfully, and planing is then a viable strategy.
+
+---
+
 ## Features
 
 The training input list is defined in `src/features.py::FEATURES` (17 variables by default):
@@ -222,8 +439,3 @@ The export script (`scripts/export_onnx.py`) converts the model, strips the ZipM
 - **LO cross sections** — all samples are generated at leading order.
 
 ---
-
-## Author
-
-**Siun Kim**
-Department of Physics, Sungkyunkwan University
