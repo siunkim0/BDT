@@ -41,6 +41,11 @@ pipeline (MadGraph5 + Pythia8 + Delphes).
 Sample paths, cross sections, and luminosity are configured in
 `config/samples.yaml`. **Do not hardcode paths in scripts.**
 
+`config/samples.yaml` is **gitignored** (it contains machine-specific paths).
+The committed template is `config/samples.yaml.example` — new users copy it
+and fill in their paths. Do not remove the real `samples.yaml` or try to
+commit it.
+
 ## Selection (HZZ standard, simplified)
 
 See `config/selection.yaml` for the canonical values. Summary:
@@ -88,6 +93,21 @@ per-lepton η; (2) DDT-style flattening; (3) DisCo / adversarial training.
 
 The planing implementation is kept in the repo for reference
 (`config/selection.yaml::train.planing.enabled`).
+
+## Repo structure
+
+```
+config/samples.yaml.example  ← committed template (FILL_ME paths)
+config/samples.yaml           ← real paths (gitignored, never committed)
+config/selection.yaml         ← cuts + BDT hyperparameters
+src/{skim,features,train,evaluate,cv,utils}.py
+scripts/export_onnx.py        ← xgboost → ONNX (--onnx-out flag for deploy path)
+scripts/root_feature_stats.py
+notebooks/bdt_tutorial.ipynb   ← interactive walk-through
+docs/bdt_guide_ko.md          ← Korean-language learning guide
+data/{ntuples,models}/         ← gitignored outputs (.gitkeep only)
+plots/, logs/, reports/        ← gitignored outputs (.gitkeep only)
+```
 
 ## Conventions
 
