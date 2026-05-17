@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local config (contains machine-specific paths — never commit)
+config/samples.yaml
+
+# Data — never commit
+data/ntuples/*.parquet
+data/models/*.json
+data/models/*.onnx
+data/models/*.csv
+data/models/*.txt
+*.root
+
+# Outputs (CMS-derived plots/results — restricted for publishing)
+plots/*
+!plots/.gitkeep
+notebooks/plots/*
+!notebooks/plots/.gitkeep
+notebooks/**/*.png
+logs/*.log
+reports/*
+!reports/.gitkeep
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store

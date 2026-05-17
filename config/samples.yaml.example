@@ -1,0 +1,31 @@
+# Run3 2023 MC samples (self-generated via MadGraph5 + Pythia8 + Delphes)
+# Fill in `path:` with the glob pattern to NanoAOD-style ROOT files on your system.
+# See https://github.com/siunkim0/madgraph for the generation pipeline.
+#
+# Usage: copy this file to `config/samples.yaml` and fill in the paths.
+#   cp config/samples.yaml.example config/samples.yaml
+
+era: "2023"
+lumi_fb: 27.7              # integrated luminosity, fb^-1 (Run2023C+D)
+
+signal:
+  ggH_ZZ_4mu:
+    path: "FILL_ME"        # e.g. output/ggH_ZZ_4mu/nano/*.root
+    xsec: 0.003585         # pb, σ(ggH) × BR(H→ZZ→4μ) — 4μ only
+    label: 1               # signal class
+
+background:
+  qqZZ_4mu:
+    path: "FILL_ME"
+    xsec: 0.077            # pb, σ(qq→ZZ) × BR(ZZ→4μ) — 4μ only
+    label: 0
+
+  DY_M50:
+    path: "FILL_ME"
+    xsec: 6225.0           # pb (inclusive M>50)
+    label: 0
+
+  TTto2L2Nu:
+    path: "FILL_ME"
+    xsec: 98.04            # pb
+    label: 0
