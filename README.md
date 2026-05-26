@@ -474,11 +474,17 @@ Mass variables (`m4l`, `mZ1`, `mZ2`) and the pT/m₄ℓ ratios are restored for 
 For deployment in a C++ framework, the trained xgboost model is exported to ONNX:
 
 ```bash
+# Defaults to data/models/bdt_v4_sr.json → bdt_v4_sr.onnx (current default)
 python -m scripts.export_onnx
-python -m scripts.export_onnx --onnx-out /path/to/deployment/bdt_v1.onnx
+
+# Export a specific model
+python -m scripts.export_onnx --model data/models/bdt_v1.json
+
+# Deploy directly into SKNanoAnalyzer
+python -m scripts.export_onnx --onnx-out /path/to/SKNanoAnalyzer/.../bdt_v4_sr.onnx
 ```
 
-The export script (`scripts/export_onnx.py`) converts the model, strips the ZipMap node for plain `(N, 2)` float output, and runs a numerical parity check (max |Δ probability| < 10⁻⁵) on the full dataset before writing. A 100-event validation CSV is also produced for C++/Python parity verification.
+The export script (`scripts/export_onnx.py`) converts the model, strips the ZipMap node for plain `(N, 2)` float output, and runs a numerical parity check (max |Δ probability| < 10⁻⁵) on the full dataset before writing. A 100-event validation CSV (`<stem>_validation.csv`) and a feature-order file (`<stem>_features.txt`) are saved next to the .onnx for C++/Python parity verification.
 
 ---
 

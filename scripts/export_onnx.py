@@ -1,15 +1,16 @@
 """Export the trained xgboost BDT to ONNX for SKNanoAnalyzer.
 
-Produces three files (default location: `data/models/`):
-  - bdt_v1.onnx              — what MLHelper loads at run time
-  - bdt_v1_features.txt      — the feature order the C++ side must reproduce
-  - bdt_v1_validation.csv    — 100 events with (FEATURES, py_score, onnx_score)
+Produces three files alongside the input .json (default model: bdt_v4_sr):
+  - <stem>.onnx              — what MLHelper loads at run time
+  - <stem>_features.txt      — the feature order the C++ side must reproduce
+  - <stem>_validation.csv    — 100 events with (FEATURES, py_score, onnx_score)
                                 used as the C++/Python parity baseline
 
 Run from project root:
 
     python -m scripts.export_onnx
-    python -m scripts.export_onnx --onnx-out /path/to/your/SKNanoAnalyzer/data/.../bdt_v1.onnx
+    python -m scripts.export_onnx --model data/models/bdt_v1.json
+    python -m scripts.export_onnx --onnx-out /path/to/SKNanoAnalyzer/.../bdt_v4_sr.onnx
 
 or
 
@@ -39,10 +40,7 @@ from src.utils import SEED, get_logger, load_yaml
 
 log = get_logger("export_onnx")
 
-JSON_PATH = PROJECT_ROOT / "data" / "models" / "bdt_v1.json"
-DEFAULT_ONNX_PATH = PROJECT_ROOT / "data" / "models" / "bdt_v1.onnx"
-FEAT_TXT  = PROJECT_ROOT / "data" / "models" / "bdt_v1_features.txt"
-VAL_CSV   = PROJECT_ROOT / "data" / "models" / "bdt_v1_validation.csv"
+DEFAULT_MODEL_PATH = PROJECT_ROOT / "data" / "models" / "bdt_v4_sr.json"
 NTUPLES   = PROJECT_ROOT / "data" / "ntuples"
 SAMPLES   = PROJECT_ROOT / "config" / "samples.yaml"
 
@@ -101,13 +99,22 @@ def load_features_from_ntuples() -> np.ndarray:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
+        "--model",
+        type=Path,
+        default=DEFAULT_MODEL_PATH,
+        help=(
+            "Path to the trained xgboost .json model. Default: "
+            "data/models/bdt_v4_sr.json (the current recommended model)."
+        ),
+    )
+    p.add_argument(
         "--onnx-out",
         type=Path,
-        default=DEFAULT_ONNX_PATH,
+        default=None,
         help=(
-            "Path to write the ONNX model. Default: data/models/bdt_v1.onnx "
-            "inside the repo. Override this to point at your SKNanoAnalyzer "
-            "data directory if you want to deploy directly."
+            "Path to write the ONNX model. Default: <model_stem>.onnx next "
+            "to the input .json. Override this to point at your "
+            "SKNanoAnalyzer data directory if you want to deploy directly."
         ),
     )
     return p.parse_args()
@@ -115,17 +122,20 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    onnx_path: Path = args.onnx_out
+    json_path: Path = args.model
+    onnx_path: Path = args.onnx_out or json_path.with_suffix(".onnx")
+    feat_txt = json_path.with_name(f"{json_path.stem}_features.txt")
+    val_csv  = json_path.with_name(f"{json_path.stem}_validation.csv")
 
-    if not JSON_PATH.exists():
+    if not json_path.exists():
         raise FileNotFoundError(
-            f"{JSON_PATH} not found — train the BDT first (python -m src.train)."
+            f"{json_path} not found — train the BDT first (python -m src.train)."
         )
 
     # 1. Load the trained xgboost model.
     model = xgb.XGBClassifier()
-    model.load_model(JSON_PATH)
-    log.info("loaded xgboost model from %s (%d features)", JSON_PATH, len(FEATURES))
+    model.load_model(json_path)
+    log.info("loaded xgboost model from %s (%d features)", json_path, len(FEATURES))
 
     # 2. Convert to ONNX.
     #    - single named input "features" of shape [batch, 23]
@@ -139,9 +149,9 @@ def main() -> None:
     onnx_model = strip_zipmap(onnx_model)
     onnx_path.parent.mkdir(parents=True, exist_ok=True)
     onnx_path.write_bytes(onnx_model.SerializeToString())
-    FEAT_TXT.write_text("\n".join(FEATURES))
+    feat_txt.write_text("\n".join(FEATURES))
     log.info("wrote %s (%d bytes)", onnx_path, onnx_path.stat().st_size)
-    log.info("wrote %s", FEAT_TXT)
+    log.info("wrote %s", feat_txt)
 
     # 3. Parity check: run both models on every available event.
     X = load_features_from_ntuples()
@@ -174,8 +184,8 @@ def main() -> None:
     val = pd.DataFrame(X[idx], columns=FEATURES)
     val["py_score"] = p_xgb[idx]
     val["onnx_score"] = p_onnx[idx]
-    val.to_csv(VAL_CSV, index=False)
-    log.info("wrote %s (%d events)", VAL_CSV, len(val))
+    val.to_csv(val_csv, index=False)
+    log.info("wrote %s (%d events)", val_csv, len(val))
 
     log.info("done — copy %s to $SKNANO_DATA/<DataEra>/HZZ4mu/", onnx_path)
 
