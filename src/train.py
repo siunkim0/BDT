@@ -73,33 +73,69 @@ def load_dataset(ntuple_dir: Path, samples_cfg: dict, lumi_fb: float) -> pd.Data
             log.info("Loaded %s: %d events, sum xsec_weight = %.2f, sum abs_weight = %.2f",
                      name, len(df), df["xsec_weight"].sum(), df["abs_weight"].sum())
     full = pd.concat(frames, ignore_index=True)
-
-    # Per-sample equal contribution within class.
-    # Each sample's training weights sum to 1; then divide by # samples in
-    # that class so the class total is 1. Result: every sample contributes
-    # the same to the loss regardless of its yield, and signal vs background
-    # are balanced.
-    full["train_weight"] = 0.0
-    for label_value in (0, 1):
-        cls = full.label == label_value
-        names = full.loc[cls, "sample"].unique()
-        n = max(len(names), 1)
-        for name in names:
-            sel = cls & (full["sample"] == name)
-            sample_sum = full.loc[sel, "abs_weight"].sum()
-            full.loc[sel, "train_weight"] = (
-                full.loc[sel, "abs_weight"] / max(sample_sum, 1e-12) / n
-            )
-    # Rescale so mean per-event weight = 1.
-    # The class-balance step above leaves total weight ≈ 2 across N events,
-    # i.e. ~1e-6 per event. With weights that small, hyperparameters like
-    # min_child_weight (default 5) become unreachable and the BDT can't
-    # build any splits. Normalizing to mean=1 makes YAML hyperparameters
-    # behave as if weights were uniform.
-    full["train_weight"] *= len(full) / full["train_weight"].sum()
+    full = build_train_weight(full)
     log.info("Class balance: sig=%d events, bkg=%d events",
              int((full.label == 1).sum()), int((full.label == 0).sum()))
     return full
+
+
+def build_train_weight(df: pd.DataFrame) -> pd.DataFrame:
+    """Construct `train_weight`: per-sample equal within class, class-balanced.
+
+    Each sample's training weights sum to 1; then divide by # samples in
+    that class so the class total is 1. Result: every sample contributes
+    the same to the loss regardless of its yield, and signal vs background
+    are balanced. Re-runnable after a downstream cut (e.g. SR mask), as
+    long as `abs_weight`, `label`, and `sample` are still present.
+    """
+    df = df.copy()
+    df["train_weight"] = 0.0
+    for label_value in (0, 1):
+        cls = df.label == label_value
+        names = df.loc[cls, "sample"].unique()
+        n = max(len(names), 1)
+        for name in names:
+            sel = cls & (df["sample"] == name)
+            sample_sum = df.loc[sel, "abs_weight"].sum()
+            df.loc[sel, "train_weight"] = (
+                df.loc[sel, "abs_weight"] / max(sample_sum, 1e-12) / n
+            )
+    # Rescale so mean per-event weight ≈ 1, so YAML hyperparameters
+    # (min_child_weight etc.) behave as if weights were uniform. Without
+    # this, the class-balance step leaves ~1e-6 per event and the BDT
+    # can't build any splits.
+    total = float(df["train_weight"].sum())
+    if total > 0:
+        df["train_weight"] *= len(df) / total
+    return df
+
+
+def apply_signal_region(df: pd.DataFrame,
+                        m4l_min: float = 105.0,
+                        m4l_max: float = 140.0) -> pd.DataFrame:
+    """Restrict the training dataframe to a narrow m4l window (Path 1).
+
+    Within the SR window, signal and background kinematic supports are
+    comparable, so the BDT can use the full feature set (mass included)
+    without learning a mass-window indicator. The downstream analysis is
+    expected to extract the signal yield with a per-category m4l fit, so
+    residual m4l structure inside the window is recovered there, not by
+    the classifier.
+    """
+    before = len(df)
+    mask = (df["m4l"] >= m4l_min) & (df["m4l"] <= m4l_max)
+    df = df.loc[mask].reset_index(drop=True)
+    log.info("Signal region cut m4l in [%.1f, %.1f] GeV: %d → %d events",
+             m4l_min, m4l_max, before, len(df))
+    for label_value, name in ((1, "signal"), (0, "background")):
+        cls = df["label"] == label_value
+        log.info("  %s after SR cut: %d events, sum xsec_weight = %.2f",
+                 name, int(cls.sum()),
+                 float(df.loc[cls, "xsec_weight"].sum()))
+    # train_weight was built from per-sample totals over the full skim.
+    # After the SR cut those totals change, so rebuild the per-sample-equal
+    # class-balanced weight on the surviving events.
+    return build_train_weight(df)
 
 
 def plot_planing_check(df: pd.DataFrame, out_path: Path,
@@ -223,6 +259,14 @@ def main() -> None:
     ntuple_dir = Path(args.ntuples)
 
     df = load_dataset(ntuple_dir, samples_cfg, samples_cfg["lumi_fb"])
+
+    sr_cfg = cfg["train"].get("signal_region", {}) or {}
+    if sr_cfg.get("enabled", False):
+        df = apply_signal_region(
+            df,
+            m4l_min=float(sr_cfg.get("m4l_min", 105.0)),
+            m4l_max=float(sr_cfg.get("m4l_max", 140.0)),
+        )
 
     planing_cfg = cfg["train"].get("planing", {}) or {}
     if planing_cfg.get("enabled", False):

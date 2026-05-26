@@ -46,9 +46,18 @@ train:
   val_size:        0.15    # fraction of train used for early-stopping
   seed:              42
   use_gpu:        true     # set false to force CPU
+  # Path 1 — signal-region-restricted training. Filter the dataframe to a
+  # narrow m4l window before splitting. With both classes confined to the
+  # SR, the kinematic supports are comparable, the full feature set (incl.
+  # mass) can be retained, and the residual m4l structure within the
+  # window is what the downstream mass fit explicitly resolves. See
+  # src/train.py::apply_signal_region.
+  signal_region:
+    enabled:      true
+    m4l_min:      105.0
+    m4l_max:      140.0
   # Planing: per-class m4l reweighting so each class has a flat m4l shape
-  # at training time. With this on, the BDT cannot exploit m4l for
-  # classification — see src/train.py::apply_planing.
+  # at training time. Kept off — see iter v3 in README for failure mode.
   planing:
     enabled:      false
     m4l_col:      "m4l"

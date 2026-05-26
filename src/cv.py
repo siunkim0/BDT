@@ -26,7 +26,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
 from .features import FEATURES
-from .train import apply_planing, load_dataset
+from .train import apply_planing, apply_signal_region, load_dataset
 from .utils import SEED, detect_gpu, get_logger, load_yaml
 
 log = get_logger("cv")
@@ -43,6 +43,14 @@ def main() -> None:
     cfg = load_yaml(args.config)
     samples_cfg = load_yaml(args.samples)
     df = load_dataset(Path(args.ntuples), samples_cfg, samples_cfg["lumi_fb"])
+
+    sr_cfg = cfg["train"].get("signal_region", {}) or {}
+    if sr_cfg.get("enabled", False):
+        df = apply_signal_region(
+            df,
+            m4l_min=float(sr_cfg.get("m4l_min", 105.0)),
+            m4l_max=float(sr_cfg.get("m4l_max", 140.0)),
+        )
 
     planing_cfg = cfg["train"].get("planing", {}) or {}
     if planing_cfg.get("enabled", False):

@@ -29,7 +29,7 @@ from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.model_selection import train_test_split
 
 from .features import FEATURES
-from .train import load_dataset
+from .train import apply_signal_region, load_dataset
 from .utils import PLOT_DIR, PROJECT_ROOT, SEED, get_logger, load_yaml
 
 log = get_logger("evaluate")
@@ -259,10 +259,12 @@ def write_summary(out_path: Path, *, auc_weighted: float, auc_unweighted: float,
         "  per-class profile of ⟨score⟩ vs m4l.",
         "",
         "## Caveats",
-        "- `m4l`, `mZ1`, `mZ2` are excluded from training inputs to keep the",
-        "  score decorrelated from the Higgs mass peak. The pT/m4l ratios still",
-        "  reference m4l as a normalization — residual correlation, if any, is",
-        "  visible in `plots/m4l_vs_score.png`.",
+        "- The `FEATURES` list is read from `src/features.py`; check that file",
+        "  to confirm exactly which inputs were used. v4_sr uses the full",
+        "  23-variable set; v2 used a 17-variable subset with mass removed.",
+        "- The score-vs-m4l correlation reported above is computed over the",
+        "  m4l window actually used at evaluation time. For v4_sr this is the",
+        "  SR window [105, 140] GeV; for v1/v2/v3 it is [70, 1000] GeV.",
         "- DY M-50 and TTto2L2Nu surviving the 4-muon skim are tiny",
         "  (~10² events each). Per-sample equal weighting (see train.py)",
         "  protects the loss from being dominated by xsec, but the BDT cannot",
@@ -301,6 +303,18 @@ def main() -> None:
     ntuple_dir = Path(args.ntuples)
 
     df = load_dataset(ntuple_dir, samples_cfg, samples_cfg["lumi_fb"])
+
+    # Mirror Path 1: if train.py was run with signal_region.enabled, the
+    # model was fit only on m4l ∈ [m4l_min, m4l_max] — apply the same cut
+    # here so the split, AUC, and m4l-decorrelation diagnostic all line up
+    # with the training population.
+    sr_cfg = cfg["train"].get("signal_region", {}) or {}
+    if sr_cfg.get("enabled", False):
+        df = apply_signal_region(
+            df,
+            m4l_min=float(sr_cfg.get("m4l_min", 105.0)),
+            m4l_max=float(sr_cfg.get("m4l_max", 140.0)),
+        )
 
     X = df[FEATURES].to_numpy(dtype=np.float32)
     y = df["label"].to_numpy(dtype=np.int64)
@@ -370,9 +384,17 @@ def main() -> None:
         PLOT_DIR / f"overtraining_{tag}.png",
     )
 
+    if sr_cfg.get("enabled", False):
+        m4l_plot_range = (
+            float(sr_cfg.get("m4l_min", 105.0)),
+            float(sr_cfg.get("m4l_max", 140.0)),
+        )
+    else:
+        m4l_plot_range = (70.0, 250.0)
     corr_bkg = plot_m4l_vs_score(
         model, X_test, y_test, m4l_test, we_test,
         PLOT_DIR / f"m4l_vs_score_{tag}.png",
+        m4l_range=m4l_plot_range,
     )
 
     write_summary(

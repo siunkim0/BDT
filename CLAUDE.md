@@ -17,9 +17,10 @@ pipeline (MadGraph5 + Pythia8 + Delphes).
 |-------|--------|--------|
 | 1. Skim   | flat parquet ntuples in `data/ntuples/`            | DONE |
 | 2. Features | engineered columns appended to the ntuples        | DONE |
-| 3. Train  | xgboost model in `data/models/`, training plots     | DONE — `bdt_v1.json` (17 mass-free feats) is the recommended model. |
+| 3. Train  | xgboost model in `data/models/`, training plots     | DONE — `bdt_v4_sr.json` (23 feats, SR-restricted training) is the recommended model. |
 | 4. Evaluate | ROC, feature importance, overtraining check, m4l-vs-score 2D | DONE |
 | 5. Planing | `bdt_v3_planed.json`, mass decorrelation study | DONE — planing alone did not hit the \|r(score, m4l)\| < 0.1 target. |
+| 6. Path 1 — SR-restricted training | `bdt_v4_sr.json`, m₄ℓ ∈ [105, 140] GeV pre-selection | DONE — AUC = 0.925 (in-window), \|r\| = **0.094** ✓ target met. |
 
 ## Environment
 
@@ -60,39 +61,51 @@ See `config/selection.yaml` for the canonical values. Summary:
 ## Features
 
 Phase 2 produces these columns from the skim. The **training input list lives
-in `src/features.py::FEATURES`** and is a strict subset: mass columns are
-stored for diagnostics but not fed to the BDT.
+in `src/features.py::FEATURES`** and currently contains all 23 columns below
+(restored to the full set for v4_sr; the SR cut at the data level provides
+the decorrelation, not feature removal).
 
-Stored columns:
+Stored columns (all in `FEATURES`):
 
-- Mass: `m4l`, `mZ1`, `mZ2`  *(diagnostic only — NOT in `FEATURES`)*
+- Mass: `m4l`, `mZ1`, `mZ2`
 - Kinematics: `pt4l`, `eta4l`, `pt_Z1`, `pt_Z2`, `dR_Z1Z2`
 - Per-lepton: `pt_mu1..4`, `eta_mu1..4` (sorted by pT)
 - Ratios: `pt_Z1/m4l`, `pt_Z2/m4l`
 - Helicity angles: `cos_theta_star`, `cos_theta1`, `cos_theta2`, `Phi`, `Phi1`
   (5 HZZ angular discriminants — see arXiv:1208.4018 for definitions)
 
-`m4l`, `mZ1`, `mZ2` are excluded from `FEATURES` to keep the BDT score
-decorrelated from the Higgs mass peak.
+v2 used a 17-variable subset that dropped `m4l`, `mZ1`, `mZ2`, the two pT/m₄ℓ
+ratios, and `dR_Z1Z2`; see README iteration history for why removing features
+turned out to be a worse decorrelation strategy than restricting the m₄ℓ
+window at the data level.
 
-#### Mass decorrelation via planing — negative result
+#### Mass decorrelation — Path 1 (SR-restricted training) is the solution
 
 Phase 5 attempted to push |r| < 0.1 by adding mass features back to FEATURES
 and reweighting each class to a flat m4l distribution at training time
-(per-class 1/density, 50 bins in [70, 250] GeV).
+(per-class 1/density, 50 bins in [70, 250] GeV). |r| went **up** monotonically
+from v1 → v2 → v3 because per-class normalization combined with single-mass-point
+signal support constructed a binary mass-region indicator the BDT learned
+preferentially (full diagnosis in README).
 
-Result: |r| went **up** monotonically from v1 → v2 → v3 as more
-m4l-correlated information entered the training pipeline. Planing flattens
-the *marginal* m4l density per class but the BDT still reads m4l through
-joint splits with `mZ1+mZ2 ≈ m4l`, pT scales, and helicity angles.
+Phase 6 (Path 1) succeeded: pre-select to m₄ℓ ∈ [105, 140] GeV at the
+dataframe boundary, retrain on the surviving 84,821 events with the full
+23-feature set, no planing. The kinematic supports of signal and background
+overlap by construction within the SR, so m₄ℓ remains in the input set
+without inducing v1-style sculpting. Result: |r(score, m4l)| on background
+**= 0.094** (target met), AUC = 0.925 in-window, KS p(sig) = 0.65,
+p(bkg) = 0.93 → no overtraining.
 
-**Recommendation**: `bdt_v1.json` (17 mass-free features, no planing) is
-the best of the three on decorrelation **and** the most stable. For tighter
-decorrelation, practical next steps are: (1) keep only helicity angles +
-per-lepton η; (2) DDT-style flattening; (3) DisCo / adversarial training.
+**Recommendation**: `bdt_v4_sr.json` (23 features, m₄ℓ ∈ [105, 140] GeV
+training cut) is the current default for any analysis that needs both
+classification power and score-mass independence. `bdt_v2.json` (17
+mass-free features, full m₄ℓ window) remains the reference baseline for the
+mass-removal approach. Apply the same SR cut at evaluation time —
+`src/evaluate.py` reads `train.signal_region` from `selection.yaml` and
+mirrors the mask automatically.
 
-The planing implementation is kept in the repo for reference
-(`config/selection.yaml::train.planing.enabled`).
+The planing implementation and v3 model are kept in the repo as a documented
+negative result (`config/selection.yaml::train.planing.enabled`).
 
 ## Repo structure
 
