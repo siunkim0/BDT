@@ -40,7 +40,7 @@ from src.utils import SEED, get_logger, load_yaml
 
 log = get_logger("export_onnx")
 
-DEFAULT_MODEL_PATH = PROJECT_ROOT / "data" / "models" / "bdt_v4_sr.json"
+DEFAULT_MODEL_PATH = PROJECT_ROOT / "data" / "models" / "bdt_v5.json"
 NTUPLES   = PROJECT_ROOT / "data" / "ntuples"
 SAMPLES   = PROJECT_ROOT / "config" / "samples.yaml"
 
@@ -104,7 +104,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_MODEL_PATH,
         help=(
             "Path to the trained xgboost .json model. Default: "
-            "data/models/bdt_v4_sr.json (the current recommended model)."
+            "data/models/bdt_v5.json (the current recommended model)."
         ),
     )
     p.add_argument(

@@ -1,47 +1,56 @@
 #!/usr/bin/env bash
-# Path 1 — signal-region-restricted training (bdt_v4_sr).
+# Train + evaluate one version of the BDT.
 #
-# Trains and evaluates the BDT with m4l ∈ [105, 140] GeV pre-selection
-# (controlled by config/selection.yaml::train.signal_region). Run from the
-# project root.
+# The signal-region cut (m4l ∈ [105, 140] GeV) is controlled by
+# config/selection.yaml::train.signal_region, not by this script.
 #
-#     bash scripts/run_path1.sh           # train + evaluate
-#     bash scripts/run_path1.sh cv        # also run 5-fold CV
+# To train a new version, override TAG — everything downstream (model file,
+# logs, plots, reports) is derived from it:
 #
+#     bash scripts/run_path1.sh                  # default TAG=v4_sr
+#     bash scripts/run_path1.sh cv               # also run 5-fold CV
+#     TAG=v5 bash scripts/run_path1.sh           # train bdt_v5.json
+#     TAG=v5 bash scripts/run_path1.sh cv        # train + evaluate + CV
+#
+# Or just edit the TAG=... line below.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-MODEL=data/models/bdt_v4_sr.json
+TAG="${TAG:-v4_sr}"
+MODEL="data/models/bdt_${TAG}.json"
+
 mkdir -p data/models logs plots reports
 
-echo "[Path 1] Training bdt_v4_sr.json ..."
+echo "[run] TAG=${TAG}  MODEL=${MODEL}"
+
+echo "[run] Training ${MODEL} ..."
 python -m src.train \
     --samples config/samples.yaml \
     --config  config/selection.yaml \
     --ntuples data/ntuples/ \
     --out     "$MODEL" \
-    2>&1 | tee logs/train_v4_sr.log
+    2>&1 | tee "logs/train_${TAG}.log"
 
-echo "[Path 1] Evaluating bdt_v4_sr.json ..."
+echo "[run] Evaluating ${MODEL} ..."
 python -m src.evaluate \
     --model   "$MODEL" \
     --ntuples data/ntuples/ \
     --samples config/samples.yaml \
     --config  config/selection.yaml \
-    2>&1 | tee logs/evaluate_v4_sr.log
+    2>&1 | tee "logs/evaluate_${TAG}.log"
 
 if [[ "${1:-}" == "cv" ]]; then
-    echo "[Path 1] 5-fold cross-validation ..."
+    echo "[run] 5-fold cross-validation ..."
     python -m src.cv \
         --samples config/samples.yaml \
         --config  config/selection.yaml \
         --ntuples data/ntuples/ \
-        2>&1 | tee logs/cv_v4_sr.log
+        2>&1 | tee "logs/cv_${TAG}.log"
 fi
 
-echo "[Path 1] Done."
-echo "  model:   $MODEL"
-echo "  report:  reports/phase4_summary_v4_sr.md"
-echo "  plots:   plots/roc_v4_sr.png, plots/feature_importance_v4_sr.png,"
-echo "           plots/overtraining_v4_sr.png, plots/m4l_vs_score_v4_sr.png"
+echo "[run] Done."
+echo "  model:   ${MODEL}"
+echo "  logs:    logs/train_${TAG}.log, logs/evaluate_${TAG}.log"
+echo "  report:  reports/phase4_summary_${TAG}.md  (suffix may be stripped by the v-regex in src/evaluate.py)"
+echo "  plots:   plots/{roc,feature_importance,overtraining,m4l_vs_score}_${TAG}.png"

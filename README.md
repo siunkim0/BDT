@@ -65,6 +65,7 @@ GPU is auto-detected (`src/utils.py::detect_gpu`); falls back to CPU silently.
 │   ├── cv.py                  ← cross-validation utility
 │   └── utils.py               ← SEED, logger, GPU probe
 ├── scripts/
+│   ├── run_path1.sh           ← one-shot train + evaluate for the SR-restricted model
 │   ├── export_onnx.py         ← xgboost → ONNX for C++ inference
 │   └── root_feature_stats.py  ← NanoAOD branch-level diagnostics
 ├── data/
@@ -168,6 +169,28 @@ Outputs:
 - `plots/feature_importance.png` — gain-based.
 - `plots/overtraining.png` — train vs. test score histograms + KS p-values.
 - `reports/phase4_summary.md` — evaluation summary.
+
+### One-shot script — `scripts/run_path1.sh`
+
+`scripts/run_path1.sh` runs Phase 3 + Phase 4 back-to-back so the long command lines above do not have to be re-typed. The signal-region cut is controlled by `config/selection.yaml::train.signal_region` (applied identically by train, evaluate, and cv via `src/train.py::apply_signal_region`), not by this script.
+
+A single `TAG` variable drives the output model file and every log / plot / report name, so training a new version is a one-line change:
+
+```bash
+bash scripts/run_path1.sh                  # default TAG=v4_sr → bdt_v4_sr.json
+bash scripts/run_path1.sh cv               # also run 5-fold cross-validation
+
+TAG=v5 bash scripts/run_path1.sh           # train bdt_v5.json
+TAG=v5 bash scripts/run_path1.sh cv        # train + evaluate + CV for v5
+```
+
+Or edit the `TAG="${TAG:-v4_sr}"` line at the top of the script. Outputs follow the tag:
+
+- `data/models/bdt_${TAG}.json`
+- `logs/{train,evaluate,cv}_${TAG}.log`
+- `plots/{roc,feature_importance,overtraining,m4l_vs_score}_${TAG}.png`
+
+Note: the `bdt_(v\d+)` regex in `src/evaluate.py` and `src/train.py` strips trailing suffixes like `_sr` from plot filenames (so `bdt_v4_sr` plots are saved as `..._v4.png`). Pure-numeric tags like `v5`, `v6` are not affected.
 
 ---
 
@@ -429,6 +452,25 @@ This is the same factorization used by the production CMS H→ZZ→4ℓ measurem
 **Recommendation.**
 
 `bdt_v4_sr.json` is the new recommended model for any analysis configuration that requires both classification performance and score-mass independence within the H→ZZ→4ℓ signal region. v2 is retained as the reference "mass-removed, wide-window" baseline. v3 (planing) is kept in the repository as a documented negative result.
+
+**Open issue and next iteration — moving to 2018.**
+
+In-repository training metrics for v4_sr (AUC, |r|, KS, CV) all pass the targets defined for Path 1, but downstream application of the model in the SKNanoAnalyzer pipeline did not produce a satisfactory result. The working hypothesis is that the 2023 integrated luminosity (17.794 fb⁻¹) provides too few events for the downstream measurement. The plan is therefore to retarget the analysis to 2018 (**L = 59.83 fb⁻¹**, √s = 13 TeV) and retrain.
+
+Note on what this actually changes: the BDT decision boundary is invariant to `lumi_fb` and to the absolute cross-section values by construction. `build_train_weight` in `src/train.py` renormalizes per-class weights to mean = 1, so lumi and xsec cancel as multiplicative constants and do not affect the trained model. The 2018 retargeting therefore is only meaningful at the BDT level if the *input MC* also changes — i.e., Run2 13 TeV samples (either reproduced via the [madgraph](https://github.com/siunkim0/madgraph) pipeline with √s = 13000, or sourced from CMS Run2 NanoAOD). The increased luminosity directly affects expected yields in the downstream analyzer; that is the part of the change that is expected to resolve the observed problem.
+
+Concrete checklist for the v5 / 2018 iteration:
+
+1. Regenerate or obtain 13 TeV NanoAOD for ggH, qqZZ, DY, tt̄; point `path:` fields in `config/samples.yaml` at them.
+2. Update `lumi_fb: 59.83` and 13 TeV cross sections in `config/samples.yaml` (already done).
+3. Verify that every HLT path in `config/selection.yaml::triggers` exists in the Run2 NanoAOD branch list; replace any Run3-only path with its Run2 equivalent.
+4. Re-run the pipeline:
+
+   ```bash
+   TAG=v5 bash scripts/run_path1.sh cv
+   ```
+
+5. Re-export to ONNX (`python -m scripts.export_onnx --model data/models/bdt_v5.json`) and re-deploy.
 
 ---
 

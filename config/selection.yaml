@@ -1,13 +1,13 @@
 # Event selection and BDT training configuration
 
 triggers:
-  - HLT_TripleMu_10_5_5_DZ
-  - HLT_TripleMu_12_10_5
-  - HLT_DoubleMu4_3_LowMass
-  - HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_Mass3p8
+  - HLT_IsoMu24
+  #- HLT_TripleMu_12_10_5
+  #- HLT_DoubleMu4_3_LowMass
+  #- HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_Mass3p8
 
 muon:
-  pt_lead:        20.0     # GeV
+  pt_lead:        26.0     # GeV
   pt_sublead:     10.0
   pt_other:        5.0
   eta_max:         2.4
@@ -15,7 +15,7 @@ muon:
   dxy_max:         0.5     # cm
   dz_max:          1.0
   sip3d_max:       4.0
-  id:              "loose" # NanoAOD branch: Muon_looseId
+  id:              "tight" # NanoAOD branch: Muon_tightId
 
 z_pairing:
   mZ1_min:        40.0     # GeV
