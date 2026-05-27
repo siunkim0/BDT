@@ -475,6 +475,14 @@ Concrete checklist for the v5 / 2018 iteration:
 
 5. Re-export to ONNX (`python -m scripts.export_onnx --model data/models/bdt_v5.json`) and re-deploy.
 
+**Confound discovered on 2026-05-27 — SKNanoAnalyzer feature-ordering bug.**
+
+The "v4_sr downstream unsatisfactory" diagnosis above was issued before the SKNanoAnalyzer integration was audited. On 2026-05-27 the C++ inference code in `SKNanoAnalyzer/Analyzers/src/HiggsBDT.cc` was found to be filling the input tensor in the **17-feature v2 order** (mass observables and `dR_Z1Z2` omitted) while declaring `N_FEAT = 23` to match the v4_sr / v5 export. The first 17 slots therefore held v2-ordered values shifted into v5 positions (`pt4l`/`eta4l` in slots 0–1 instead of 3–4, the helicity angles in slots 12–16 instead of 18–22), and slots 17–22 contained uninitialized memory. The ONNX runtime silently consumed the malformed tensor — no error, just nonsense scores.
+
+This means the "v4_sr is unsatisfactory downstream" observation that motivated the v5 / 2018 retargeting was **not a clean test of v4_sr**. The luminosity hypothesis may still be correct, but it has not been independently verified; the integration bug alone is sufficient to explain the observed downstream behavior. After the C++ fix is deployed, v4_sr should be re-evaluated on the original 2023 pipeline before drawing further conclusions about whether the 2018 retargeting is actually necessary at the BDT level.
+
+Lesson for ONNX deployment: the `<stem>_features.txt` file emitted by `scripts/export_onnx.py` should be treated as the authoritative feature-order contract. C++ integrators must read it (or a hash of it) at startup and verify it against the order in which they populate the input tensor, since neither xgboost nor onnxruntime validates feature names at inference time.
+
 ---
 
 ## Lessons Learned
