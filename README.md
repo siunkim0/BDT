@@ -585,7 +585,8 @@ For deployment in a C++ framework, the trained xgboost model is exported to ONNX
 python -m scripts.export_onnx
 
 # Export a specific model
-python -m scripts.export_onnx --model data/models/bdt_v4_sr.json
+python -m scripts.export_onnx --model data/models/bdt_v4_sr.
+# When you do this, it will make two outputs "*.onnx", "*_features.txt", the txt carries the order of feature to connect with SKNanoAnalyzer properly. No more worries about matching the order of features!
 
 # Deploy directly into SKNanoAnalyzer
 python -m scripts.export_onnx --onnx-out /path/to/SKNanoAnalyzer/.../bdt_v5_run2.onnx
