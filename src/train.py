@@ -371,9 +371,12 @@ def main() -> None:
 
     # Tree structure — first tree is usually the most informative single split.
     # Change tree_idx to inspect other rounds (e.g. best_iter, last tree).
-    tree_idx = 100
     booster = model.get_booster()
     booster.feature_names = list(FEATURES)
+    # Early stopping can leave far fewer than n_estimators trees (e.g. planing
+    # converges in ~50 rounds), so clamp to what actually exists.
+    n_trees = booster.num_boosted_rounds()
+    tree_idx = min(100, n_trees - 1)
     fig, ax = plt.subplots(figsize=(16, 8))
     xgb.plot_tree(booster, num_trees=tree_idx, ax=ax)
     ax.set_title(

@@ -59,7 +59,7 @@ train:
   # Planing: per-class m4l reweighting so each class has a flat m4l shape
   # at training time. Kept off — see iter v3 in README for failure mode.
   planing:
-    enabled:      false
+    enabled:      true
     m4l_col:      "m4l"
     n_bins:        50
     m4l_range:    [70, 250]   # GeV
