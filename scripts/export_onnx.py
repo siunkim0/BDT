@@ -1,10 +1,12 @@
 """Export the trained xgboost BDT to ONNX for SKNanoAnalyzer.
 
-Produces three files alongside the input .json (default model: bdt_v4_sr):
-  - <stem>.onnx              — what MLHelper loads at run time
-  - <stem>_features.txt      — the feature order the C++ side must reproduce
-  - <stem>_validation.csv    — 100 events with (FEATURES, py_score, onnx_score)
-                                used as the C++/Python parity baseline
+Produces (default model: bdt_v5):
+  - <onnx_stem>.onnx           — what MLHelper loads at run time
+  - <onnx_stem>_features.txt   — feature order the C++ side reads at run time;
+                                 sits next to the .onnx so the deployed pair
+                                 stays together
+  - <json_stem>_validation.csv — 100 events with (FEATURES, py_score,
+                                 onnx_score), the C++/Python parity baseline
 
 Run from project root:
 
@@ -124,7 +126,10 @@ def main() -> None:
     args = parse_args()
     json_path: Path = args.model
     onnx_path: Path = args.onnx_out or json_path.with_suffix(".onnx")
-    feat_txt = json_path.with_name(f"{json_path.stem}_features.txt")
+    # Keep the feature-order file next to the .onnx so the deployed pair always
+    # travels together — the SKNanoAnalyzer HiggsBDT analyzer reads it at run
+    # time (<onnx_stem>_features.txt) to assemble its input in the right order.
+    feat_txt = onnx_path.with_name(f"{onnx_path.stem}_features.txt")
     val_csv  = json_path.with_name(f"{json_path.stem}_validation.csv")
 
     if not json_path.exists():
@@ -187,7 +192,9 @@ def main() -> None:
     val.to_csv(val_csv, index=False)
     log.info("wrote %s (%d events)", val_csv, len(val))
 
-    log.info("done — copy %s to $SKNANO_DATA/<DataEra>/HZZ4mu/", onnx_path)
+    log.info("done — copy BOTH %s and %s to $SKNANO_DATA/<DataEra>/BDT/HZZ4mu/ "
+             "(the analyzer reads the _features.txt at run time)",
+             onnx_path.name, feat_txt.name)
 
 
 if __name__ == "__main__":
