@@ -378,7 +378,7 @@ def main() -> None:
     n_trees = booster.num_boosted_rounds()
     tree_idx = min(100, n_trees - 1)
     fig, ax = plt.subplots(figsize=(16, 8))
-    xgb.plot_tree(booster, num_trees=tree_idx, ax=ax)
+    xgb.plot_tree(booster, tree_idx=tree_idx, ax=ax)
     ax.set_title(
         f"Tree {tree_idx} (of {bdt_cfg['n_estimators']}) — "
         f"depth={bdt_cfg['max_depth']}, lr={bdt_cfg['learning_rate']}"
