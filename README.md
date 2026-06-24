@@ -218,7 +218,7 @@ Use a new model name (`--out data/models/bdt_v6.json`) when iterating to preserv
 
 ## Iteration History
 
-The production model (`bdt_v5_run2.json`) is the result of five iterations addressing the question of how the BDT score should be constructed relative to the Higgs mass peak. The history is documented here because each iteration produced a methodological observation that motivated the next.
+The production model (`bdt_v5_run2.json`) is the result of five iterations addressing the question of how the BDT score should be constructed relative to the Higgs mass peak. The history is documented here because each iteration produced a methodological observation that motivated the next. A sixth iteration (v6), run after production was settled, probed whether stacking planing on top of Path 1 improves the decorrelation; it is documented below as a negative result and was not adopted.
 
 | Iter. | Strategy | AUC | \|r(score, m₄ℓ)\| | Outcome |
 |-------|----------|-----|-------------------|---------|
@@ -227,10 +227,11 @@ The production model (`bdt_v5_run2.json`) is the result of five iterations addre
 | **v3** | Per-class planing of m₄ℓ distribution | 0.81 | 0.73 | Decorrelation worsened; failure analyzed |
 | **v4_sr** | Path 1: SR-restricted training (m₄ℓ ∈ [105, 140] GeV), 13.6 TeV / 2023 MC | 0.925 | 0.094 ✓ | In-repo targets met; deployment delayed by C++ integration bug — see [SKNanoAnalyzer integration history](#sknanoanalyzer-integration-history) |
 | **v5_run2** *(production)* | Path 1 retargeted to Run2 / 2018, √s = 13 TeV, L = 59.83 fb⁻¹ | 0.926 | 0.091 ✓ | **+53% Asimov Z over cut-based downstream** |
+| **v6** | Path 1 + per-class m₄ℓ planing stacked (SR cut *then* planing, Run2 / 2018) | 0.959 w / 0.61 u | 0.076 ✓ | Best decorrelation and m₄ℓ demoted off the top of the gain ranking, but planing weight pathology returns (CV 0.89 ± 0.08, unstable; w/u AUC divergence) — not adopted |
 
 The principal finding is that per-class planing fails for narrow-resonance signals when implemented with per-class weight normalization, due to weight extrapolation in regions of zero signal support. The Path 1 approach (signal-region pre-selection followed by in-region training) is consistent with the standard CMS H→ZZ→4ℓ workflow and is what eventually delivered the target |r(score, m₄ℓ)| < 0.1 while retaining classification power and, after deployment, a +53% improvement in Asimov significance over the cut-based selection in the same mass window.
 
-**Cross-iteration AUC caveat.** v1/v2/v3 AUC values are computed on the full m₄ℓ ∈ [70, 1000] GeV window; v4_sr and v5_run2 AUC are computed on [105, 140] GeV. Inside the SR window the signal and background kinematic supports are much more similar, so the classification problem is intrinsically harder — v5_run2's 0.926 over a 35 GeV window is a stronger result than v2's 0.935 over a 930 GeV window. The relevant cross-iteration comparison is the score-vs-m₄ℓ correlation, not the raw AUC.
+**Cross-iteration AUC caveat.** v1/v2/v3 AUC values are computed on the full m₄ℓ ∈ [70, 1000] GeV window; v4_sr, v5_run2 and v6 AUC are computed on [105, 140] GeV. Inside the SR window the signal and background kinematic supports are much more similar, so the classification problem is intrinsically harder — v5_run2's 0.926 over a 35 GeV window is a stronger result than v2's 0.935 over a 930 GeV window. The relevant cross-iteration comparison is the score-vs-m₄ℓ correlation, not the raw AUC. v6 is reported as two numbers — weighted (xsec) AUC 0.959 vs unweighted 0.61 — because its planed weights make the weighted figure non-comparable to the others; see the [v6 entry](#v6--path-1--planing-stacked-negative-result) for why the gap is itself the diagnostic.
 
 ### v1 — Full feature set
 
@@ -504,6 +505,38 @@ Every BDT working point from 0.50 onward improves on the cut-based reference; th
 **Status.**
 
 v5_run2 is the production default. The deployment in SKNanoAnalyzer/`HiggsBDT.cc` applies the SR gate before ONNX inference and the per-WP mass histograms are filled in a single pass; the offline significance scan is `scripts/wp_scan.py` in the SKNanoAnalyzer repo. No further iteration is planned at the BDT level for the 4μ channel.
+
+### v6 — Path 1 + planing stacked (negative result)
+
+**Motivation and method.**
+
+v3 showed that per-class planing on the full window fails, and v4_sr / v5_run2 showed that a signal-region pre-selection alone achieves |r| < 0.1. v6 asked the natural follow-up: with both classes already restricted to the same m₄ℓ window, does *adding* per-class planing on top of the SR cut push the decorrelation further? The configuration is the standard Path 1 SR cut (m₄ℓ ∈ [105, 140] GeV, 475,661 → 84,821 events) with `train.planing.enabled: true` layered on, on the same Run2 / 2018 inputs as v5_run2. Everything else (features, hyperparameters, seed) is unchanged.
+
+**The decorrelation does improve, and m₄ℓ is demoted.**
+
+| Metric | v5_run2 (SR only) | **v6 (SR + planing)** |
+|--------|-------------------|------------------------|
+| r(score, m₄ℓ), background | −0.091 | **+0.076** |
+| Top feature (by gain) | m4l | cos_theta2 |
+| Rank of m4l (by gain) | 1 | 3 |
+| KS p, signal / background | 0.62 / 0.88 | 0.78 / 0.90 |
+
+Stacking planing on the SR cut is the first configuration in which m₄ℓ is *not* the top feature. The gain ranking flattens dramatically and reorders onto the helicity angles and lepton kinematics — `cos_theta2`, `pt_mu3`, then `m4l`, `pt_mu1`, `cos_theta_star`, `Phi1` — and the peak gain drops by ~10× relative to v5 (the SR-only model coasts on the residual peak-vs-continuum mass structure; planing removes that handle). The score-vs-m₄ℓ profile (`plots/m4l_vs_score_v6.png`) is flat to r = 0.076, the smallest |r| of any iteration. As an answer to "can planing flatten m₄ℓ inside the SR" — yes, and `plots/feature_importance_v6.png` is the cleanest decorrelation signature in the project.
+
+**But the planing weight pathology returns, in a subtler form.**
+
+| Metric | v5_run2 (SR only) | **v6 (SR + planing)** |
+|--------|-------------------|------------------------|
+| Test AUC, weighted (xsec) | 0.925 | 0.959 |
+| Test AUC, unweighted | 0.926 | **0.614** |
+| 5-fold CV AUC | 0.955 ± 0.034 | **0.893 ± 0.075** |
+| CV best_iter range | (stable, mean 285 trees) | 0, 3, 4, 20, 259 (mean 58 trees) |
+
+For v5 the weighted and unweighted test AUC agree (0.925 vs 0.926): the classifier separates a typical event as well as it separates the physical yield, which is the signature of a stable model. For v6 they diverge sharply (0.959 vs 0.614). The `1/density` planing weights are not uniform inside the SR — a handful of events in sparse m₄ℓ bins acquire large weights — so the xsec-weighted AUC of 0.959 is carried by those few high-weight events, while on a per-event basis the model is only modestly better than chance. The CV confirms the instability: the fold AUC spread doubles (σ 0.034 → 0.075) and several folds early-stop almost immediately (best_iter 0, 3, 4), i.e. the high-weight events make the validation metric jump around so much that early stopping fires before the model learns. This is the same weight-extrapolation failure mode as v3, attenuated by the SR cut but not eliminated.
+
+**Status.**
+
+Not adopted. v6 buys a marginal decorrelation improvement (|r| 0.091 → 0.076, both already within target) at the cost of a model that is unstable to train and whose nominal AUC is inflated by a few high-weight events. The standing workflow remains Path 1 SR-only (v5_run2): it meets the |r| < 0.1 target, keeps weighted and unweighted performance consistent, and trains stably. The lesson reinforces the v3 finding — per-class planing with weight renormalization is fragile for a narrow resonance even after the support-mismatch problem is removed by the SR cut, because the residual non-uniformity of the inverse-density weights is enough to destabilize training. v6 is retained only as the documented "SR + planing" probe; m₄ℓ being usable but decorrelated (the v4_sr / v5 outcome) is preferable to m₄ℓ being forcibly flattened at the cost of training stability.
 
 ---
 
