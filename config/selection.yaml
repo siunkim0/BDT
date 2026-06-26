@@ -53,7 +53,7 @@ train:
   # window is what the downstream mass fit explicitly resolves. See
   # src/train.py::apply_signal_region.
   signal_region:
-    enabled:      true
+    enabled:      false
     m4l_min:      105.0
     m4l_max:      140.0
   # Planing: per-class m4l reweighting so each class has a flat m4l shape
