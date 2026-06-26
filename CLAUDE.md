@@ -15,10 +15,13 @@ pipeline (MadGraph5 + Pythia8 + Delphes, NanoAOD-style output).
 | Iter | Description | Status |
 |------|-------------|--------|
 | v1 / v2 / v3 | mass-included / mass-removed / planing | historical — see README iteration history |
-| **Path 1 (v4_sr)** | `bdt_v4_sr.json`, m₄ℓ ∈ [105, 140] GeV, 23 feats, 13.6 TeV / 2023 MC | in-repo targets met (AUC 0.925, \|r\| = 0.094 ✓); downstream application in SKNanoAnalyzer was unsatisfactory |
-| **v5** *(in progress)* | retrain on Run2 / 2018 MC (L = 59.83 fb⁻¹, √s = 13 TeV), same Path 1 procedure | active iteration |
+| **Path 1 (v4_sr)** | `bdt_v4_sr.json`, m₄ℓ ∈ [105, 140] GeV, 23 feats, 13.6 TeV / 2023 MC | in-repo targets met (AUC 0.925, \|r\| = 0.094 ✓); superseded by v5_run2 for deployment. The original "unsatisfactory downstream" symptom was traced to a C++ feature-ordering bug, not a BDT problem — see README integration history |
+| **v5_run2** *(production)* | `bdt_v5_run2.json`, Path 1 on Run2 / 2018 MC (L = 59.83 fb⁻¹, √s = 13 TeV) | production default. AUC 0.926, \|r\| = 0.091 ✓; deployed in SKNanoAnalyzer, **+33% Asimov Z over matched-selection cut-based** downstream |
+| v6 | Path 1 + per-class m₄ℓ planing stacked (Run2 / 2018) | negative result, not adopted — best decorrelation (\|r\| = 0.076) but planing weight pathology returns (unstable training, w/u AUC divergence). See README v6 entry |
 
-No production-default model at present. The Path 1 *procedure* (SR pre-selection + full 23-feature input + in-region training) is the standing workflow. Apply the SR cut at evaluation time too — `src/evaluate.py` reads `train.signal_region` from `selection.yaml` and mirrors the mask automatically.
+**`bdt_v5_run2.json` is the production default.** The Path 1 *procedure* (SR pre-selection + full 23-feature input + in-region training) is the standing workflow. Apply the SR cut at evaluation time too — `src/evaluate.py` reads `train.signal_region` from `selection.yaml` and mirrors the mask automatically.
+
+Downstream significance is evaluated in SKNanoAnalyzer with a **matched event selection** between the cut-based and BDT analyzers (window m₄ℓ ∈ [120, 130] GeV). An earlier mismatched-selection comparison overstated the gain as +53%; the fair number is +33%. Re-run results live at `/data6/Users/snuintern2/Higgs/Tools/ye/`.
 
 ## Environment
 
@@ -66,16 +69,23 @@ v2 used a 17-variable mass-free subset; see README iteration history.
 - Logging: `logging` module, INFO level. No `print()` in src/.
 - Plots: matplotlib, PNG (300 dpi) to `plots/`. Never `plt.show()`.
 
-## Cross sections (currently 13.6 TeV — v5 switches to 13 TeV)
+## Cross sections
 
-| Sample | σ (pb) | Notes |
+The production model (v5_run2) trains on 13 TeV / 2018 MC; the live σ and `lumi_fb`
+values are in `samples.yaml`. The table below records the original **13.6 TeV / 2023**
+(v4_sr) values for reference — when switching eras, update both `lumi_fb` and these σ
+values in `samples.yaml` to the matching √s equivalents.
+
+| Sample | σ (pb), 13.6 TeV | Notes |
 |--------|--------|-------|
 | ggH→ZZ→4l | 0.00637 | σ(ggH) × BR(H→ZZ→4l), all flavors |
 | qqZZ→4l | 1.39 | full ZZ→4l |
 | DY M>50 | 6225 | inclusive |
 | TT 2L2Nu | 98.04 | dilepton |
 
-For v5 (2018), update both `lumi_fb` and these σ values in `samples.yaml` to 13 TeV equivalents.
+Reminder: the BDT decision boundary is invariant to `lumi_fb` and absolute σ
+(`build_train_weight` renormalizes per-class to mean = 1); changing these only affects
+downstream expected yields, not the trained model. See "Common gotchas" below.
 
 ## Common gotchas
 

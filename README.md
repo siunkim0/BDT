@@ -30,10 +30,10 @@ The classifier is trained exclusively on MC. No collision data is used.
 
 | Analysis | S | B | Asimov Z |
 |---|---|---|---|
-| Cut-based | 27.36 | 43.61 | 3.79 |
-| BDT > 0.85 (v5_run2) | 22.64 | 9.15 | **5.82** |
+| Cut-based | 28.37 | 14.87 | 5.96 |
+| BDT > 0.85 (v5_run2) | 23.64 | 3.59 | **7.94** |
 
-**+53% improvement in significance** at the optimal working point. See the [v5_run2 iteration entry](#v5_run2--production-model-run2-2018) for the full working-point scan and the [SKNanoAnalyzer integration](#sknanoanalyzer-integration-history) subsection for the deployment history (including the feature-ordering bug that delayed deployment by one iteration).
+**+33% improvement in significance** at the optimal working point. See the [v5_run2 iteration entry](#v5_run2--production-model-run2-2018) for the full working-point scan and the [SKNanoAnalyzer integration](#sknanoanalyzer-integration-history) subsection for the deployment history (including the feature-ordering bug that delayed deployment by one iteration, and the selection-matching correction that brought the cut-based baseline up to a fair comparison).
 
 ---
 
@@ -226,10 +226,10 @@ The production model (`bdt_v5_run2.json`) is the result of five iterations addre
 | **v2** | Mass-related features removed (17 vars) | 0.935 | 0.55 | Partial decorrelation; superseded |
 | **v3** | Per-class planing of m₄ℓ distribution | 0.81 | 0.73 | Decorrelation worsened; failure analyzed |
 | **v4_sr** | Path 1: SR-restricted training (m₄ℓ ∈ [105, 140] GeV), 13.6 TeV / 2023 MC | 0.925 | 0.094 ✓ | In-repo targets met; deployment delayed by C++ integration bug — see [SKNanoAnalyzer integration history](#sknanoanalyzer-integration-history) |
-| **v5_run2** *(production)* | Path 1 retargeted to Run2 / 2018, √s = 13 TeV, L = 59.83 fb⁻¹ | 0.926 | 0.091 ✓ | **+53% Asimov Z over cut-based downstream** |
+| **v5_run2** *(production)* | Path 1 retargeted to Run2 / 2018, √s = 13 TeV, L = 59.83 fb⁻¹ | 0.926 | 0.091 ✓ | **+33% Asimov Z over cut-based downstream** |
 | **v6** | Path 1 + per-class m₄ℓ planing stacked (SR cut *then* planing, Run2 / 2018) | 0.959 w / 0.61 u | 0.076 ✓ | Best decorrelation and m₄ℓ demoted off the top of the gain ranking, but planing weight pathology returns (CV 0.89 ± 0.08, unstable; w/u AUC divergence) — not adopted |
 
-The principal finding is that per-class planing fails for narrow-resonance signals when implemented with per-class weight normalization, due to weight extrapolation in regions of zero signal support. The Path 1 approach (signal-region pre-selection followed by in-region training) is consistent with the standard CMS H→ZZ→4ℓ workflow and is what eventually delivered the target |r(score, m₄ℓ)| < 0.1 while retaining classification power and, after deployment, a +53% improvement in Asimov significance over the cut-based selection in the same mass window.
+The principal finding is that per-class planing fails for narrow-resonance signals when implemented with per-class weight normalization, due to weight extrapolation in regions of zero signal support. The Path 1 approach (signal-region pre-selection followed by in-region training) is consistent with the standard CMS H→ZZ→4ℓ workflow and is what eventually delivered the target |r(score, m₄ℓ)| < 0.1 while retaining classification power and, after deployment, a +33% improvement in Asimov significance over the cut-based selection in the same mass window (evaluated with the cut-based and BDT analyzers using a matched event selection — see the [v5_run2 entry](#v5_run2--production-model-run2-2018)).
 
 **Cross-iteration AUC caveat.** v1/v2/v3 AUC values are computed on the full m₄ℓ ∈ [70, 1000] GeV window; v4_sr, v5_run2 and v6 AUC are computed on [105, 140] GeV. Inside the SR window the signal and background kinematic supports are much more similar, so the classification problem is intrinsically harder — v5_run2's 0.926 over a 35 GeV window is a stronger result than v2's 0.935 over a 930 GeV window. The relevant cross-iteration comparison is the score-vs-m₄ℓ correlation, not the raw AUC. v6 is reported as two numbers — weighted (xsec) AUC 0.959 vs unweighted 0.61 — because its planed weights make the weighted figure non-comparable to the others; see the [v6 entry](#v6--path-1--planing-stacked-negative-result) for why the gap is itself the diagnostic.
 
@@ -486,21 +486,36 @@ The training-side metrics are statistically indistinguishable from v4_sr, as exp
 
 The v5_run2 model was deployed in SKNanoAnalyzer with the feature ordering verified against `bdt_v5_run2_features.txt`, the C++ helicity-angle implementation confirmed by distribution-level parity check against `src/features.py::add_helicity_angles` (matching std across all five angles), and BDT inference restricted to the training SR (m₄ℓ ∈ [105, 140] GeV) to avoid out-of-domain extrapolation. A 10-point working-point scan was run; signal (ggH + VBFH + VH) and background (qqZZ + DY + tt̄) yields were counted in the consistent fit window m₄ℓ ∈ [120, 130] GeV; significance is the Asimov approximation Z = √(2·[(S+B)·ln(1+S/B) − S]). The cut-based reference is the same selection in the same window.
 
+**Selection-matching correction.** An earlier version of this scan reported a +53% improvement (cut-based Z = 3.79, BDT Z = 5.82). That comparison was unfair: the cut-based analyzer applied a looser event selection than the BDT analyzer, so its background was inflated (B = 43.61 vs the BDT analyzer's). After editing the cut-based analyzer to use the **same event selection as the BDT path** and re-running all models, the cut-based baseline tightened to S = 28.37, B = 14.87, Z = 5.96, and the table below reflects the fair, apples-to-apples comparison. The headline improvement is correspondingly revised from +53% to **+33%**. The scan was regenerated by `Tools/wp_scan.py` on the 2018 MC re-run (`/data6/Users/snuintern2/Higgs/Tools/ye/`).
+
 | BDT cut | S | B | Asimov Z |
 |---------|------|-------|----------|
-| cut-based | 27.36 | 43.61 | 3.79 |
-| > 0.50 | 26.72 | 30.91 | 4.29 |
-| > 0.55 | 26.66 | 30.58 | 4.30 |
-| > 0.60 | 26.55 | 30.18 | 4.30 |
-| > 0.65 | 26.33 | 26.95 | 4.47 |
-| > 0.70 | 25.97 | 23.40 | 4.67 |
-| > 0.75 | 25.40 | 20.14 | 4.85 |
-| > 0.80 | 24.56 | 13.87 | 5.40 |
-| **> 0.85** | **22.64** | **9.15** | **5.82** |
-| > 0.90 | 17.56 | 6.52 | 5.27 |
+| cut-based | 28.37 | 14.87 | 5.96 |
+| > 0.50 | 27.77 | 11.98 | 6.31 |
+| > 0.55 | 27.72 | 11.80 | 6.33 |
+| > 0.60 | 27.60 | 11.52 | 6.36 |
+| > 0.65 | 27.38 | 11.13 | 6.39 |
+| > 0.70 | 27.03 | 10.69 | 6.41 |
+| > 0.75 | 26.44 | 7.70 | 6.99 |
+| > 0.80 | 25.61 | 4.57 | 7.92 |
+| **> 0.85** | **23.64** | **3.59** | **7.94** |
+| > 0.90 | 18.42 | 1.89 | 7.72 |
 | > 0.95 | 0.03 | 0.00 | — (insufficient stat) |
 
-Every BDT working point from 0.50 onward improves on the cut-based reference; the scan peaks at score > 0.85 with Z = 5.82, a **+53% improvement in significance**. The shape of the curve is the expected concave optimum: at low cuts background dominates the change; at very high cuts signal loss outpaces background rejection. The descent at 0.95 reflects insufficient MC statistics rather than a real optimum shift.
+Every BDT working point from 0.50 onward improves on the cut-based reference; the scan peaks at score > 0.85 with Z = 7.94, a **+33% improvement in significance** over the matched-selection cut-based baseline (Z = 5.96). The shape of the curve is the expected concave optimum: at low cuts background dominates the change; at very high cuts signal loss outpaces background rejection. The descent at 0.95 reflects insufficient MC statistics rather than a real optimum shift. The B-column drops at 0.80–0.90 partly because DY contributes zero events to those high-BDT histograms (the model rejects the reducible background almost entirely at tight cuts).
+
+**Cross-model downstream comparison.** With the analyzer selection now matched, every model iteration was re-run through the same scan. The best working point (max Asimov Z with B ≥ 0.5) for each, against the common cut-based baseline Z = 5.96:
+
+| Model | Best WP | S | B | Asimov Z |
+|-------|---------|------|-------|----------|
+| cut-based | — | 28.37 | 14.87 | 5.96 |
+| v1 (mass-included) | > 0.95 | 27.68 | 11.30 | 6.42 |
+| v2 (mass-removed) | > 0.55 | 26.91 | 8.39 | 6.90 |
+| v3 (planing) | > 0.70 | 27.56 | 11.90 | 6.28 |
+| **v5_run2 (production)** | **> 0.85** | **23.64** | **3.59** | **7.94** |
+| v6 (SR + planing) | > 0.95 | 22.34 | 6.35 | 6.47 |
+
+v5_run2 is the best downstream model by a clear margin, consistent with its selection as production. The v1 number is not a meaningful "gain" — v1's score is ≈ a function of m₄ℓ (r = −0.99), so a tight v1 cut is just re-applying a mass window and the curve rises monotonically to 0.95. v2/v3/v6 all beat cut-based but trail v5_run2, none reaching its background rejection (B = 3.59 at the optimum vs 8–12 for the others). The full per-WP scans for every model are in `/data6/Users/snuintern2/Higgs/Tools/ye/{v1,v2,v3,v5,v6}/sig.txt`.
 
 **Status.**
 
@@ -548,7 +563,7 @@ This section documents the C++ deployment of the trained model in SKNanoAnalyzer
 
 The initial deployment of v4_sr produced a downstream BDT score distribution concentrated near 0.05 on signal MC (mean = 0.080, std = 0.056), inconsistent with the trained model's KS-validated train-vs-test score distribution. The cause was traced to `HiggsBDT.cc` filling the input tensor in the **17-feature v2 order** (mass observables and `dR_Z1Z2` omitted) while declaring `N_FEAT = 23` to match the v4_sr / v5 export. The first 17 slots therefore held v2-ordered values shifted into v5 positions (`pt4l`/`eta4l` in slots 0–1 instead of 3–4, the helicity angles in slots 12–16 instead of 18–22), and slots 17–22 contained uninitialized memory. The ONNX runtime silently consumed the malformed tensor — no error, just nonsense scores.
 
-The fix was to populate the 23 input slots in the order documented in `bdt_v5_run2_features.txt` (and the corresponding v4_sr file). After the fix, the C++ score distribution recovered the expected bimodal shape — signal events concentrate near 1 (high purity), background near 0 — and the +53% significance improvement scan summarized in the [v5_run2 entry](#v5_run2--production-model-run2-2018) was obtained.
+The fix was to populate the 23 input slots in the order documented in `bdt_v5_run2_features.txt` (and the corresponding v4_sr file). After the fix, the C++ score distribution recovered the expected bimodal shape — signal events concentrate near 1 (high purity), background near 0 — and the significance improvement scan summarized in the [v5_run2 entry](#v5_run2--production-model-run2-2018) was obtained (+33% over the matched-selection cut-based baseline).
 
 **Implication for the v4_sr-on-Run3 finding.** The original "v4_sr is unsatisfactory downstream" observation, which motivated the v5 / 2018 retargeting, was made under the feature-ordering bug and is therefore not a clean test of v4_sr at the original 2023 / 13.6 TeV target. The luminosity hypothesis (more events needed) may still be correct, but the integration bug alone is sufficient to explain the original symptom. v4_sr on the Run3 / 2023 pipeline was not re-tested after the fix; v5_run2 superseded the deployment target before that comparison was needed.
 
@@ -576,7 +591,7 @@ The iterations support the following observations.
 
 **On per-class planing.** The procedure fails when class supports differ substantially over the planing observable. Per-class normalization constructs a trivially-discriminating region-presence indicator that the classifier learns preferentially. The CMS B2G-23-003 charged-Higgs analysis applies a similar reweighting strategy successfully, but does so on training samples combining multiple signal mass hypotheses, in which case signal and background have comparable support. Direct transfer of the planing methodology to single-mass-point analyses without adapting the procedure is unsound.
 
-**On the standard analysis workflow.** The CMS H→ZZ→4ℓ measurement workflow (signal-region pre-selection followed by in-region BDT training and per-category mass fitting) is well-motivated by the failure modes documented above. Specifically, pre-selection restricts the m₄ℓ phase space available to both classes, reducing the lever arm for sculpting by construction. The full feature set, including m₄ℓ itself, can be retained in training without inducing the v1 sculpting, because the residual m₄ℓ structure within the SR is what the downstream mass fit explicitly resolves. The Path 1 result (|r| = 0.091, AUC = 0.926, +53% downstream Asimov Z over cut-based in [120, 130] GeV) confirms this empirically end-to-end: removing the lever arm at the data level rather than the feature level was what allowed the model to retain both classification power and score-mass independence simultaneously.
+**On the standard analysis workflow.** The CMS H→ZZ→4ℓ measurement workflow (signal-region pre-selection followed by in-region BDT training and per-category mass fitting) is well-motivated by the failure modes documented above. Specifically, pre-selection restricts the m₄ℓ phase space available to both classes, reducing the lever arm for sculpting by construction. The full feature set, including m₄ℓ itself, can be retained in training without inducing the v1 sculpting, because the residual m₄ℓ structure within the SR is what the downstream mass fit explicitly resolves. The Path 1 result (|r| = 0.091, AUC = 0.926, +33% downstream Asimov Z over a matched-selection cut-based baseline in [120, 130] GeV) confirms this empirically end-to-end: removing the lever arm at the data level rather than the feature level was what allowed the model to retain both classification power and score-mass independence simultaneously.
 
 **On diagnostic plotting.** Diagnostic plots prior to training are essential in any decorrelation procedure that involves event reweighting. The weighted training distributions should be inspected before training. The incremental cost is negligible relative to the cost of training and debugging a failed model.
 
@@ -640,7 +655,7 @@ The export script (`scripts/export_onnx.py`) converts the model, strips the ZipM
 - **MC only** — no collision data is used in training. HLT, muon ID, and impact parameter selections all pass trivially on Delphes-generated samples.
 - **No PU reweighting** — pileup effects are not modeled at training time.
 - **No lepton scale factors** — muon ID/iso/trigger efficiencies are not corrected at training time. (Downstream SKNanoAnalyzer applies muon SFs at evaluation time.)
-- **Reducible backgrounds** — DY and tt̄ produce four-muon final states only through jet → μ fakes, which Delphes models poorly (see [madgraph README](https://github.com/siunkim0/madgraph#background-samples)). The +53% downstream improvement should be interpreted with this caveat: a fraction of the BDT's background-rejection gain comes from removing reducible-background events that may be mismodeled.
+- **Reducible backgrounds** — DY and tt̄ produce four-muon final states only through jet → μ fakes, which Delphes models poorly (see [madgraph README](https://github.com/siunkim0/madgraph#background-samples)). The +33% downstream improvement should be interpreted with this caveat: a fraction of the BDT's background-rejection gain comes from removing reducible-background events that may be mismodeled.
 - **LO cross sections** — all samples are generated at leading order.
 - **Single-category measurement** — the downstream comparison uses a single tight working point (score > 0.85) rather than a multi-category fit. A multi-category extension (loose / medium / tight bins each with an independent mass fit) is the standard CMS H→ZZ→4ℓ workflow and would further improve the combined significance. This was not pursued because the single-category result was already sufficient for the project's learning objectives.
 
