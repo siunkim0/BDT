@@ -555,6 +555,23 @@ At loose cuts the honest significance is ~3.9, not 6.4. The tight-cut peak survi
 
 v5_run2 is the best downstream model by a clear margin, consistent with its selection as production. The v1 number is not a meaningful "gain" — v1's score is ≈ a function of m₄ℓ (r = −0.99), so a tight v1 cut is just re-applying a mass window and the curve rises monotonically to 0.95. v2/v3/v6 all beat cut-based but trail v5_run2, none reaching its background rejection (B = 3.59 at the optimum vs 8–12 for the others). The full per-WP scans for every model are in `/data6/Users/snuintern2/Higgs/Tools/ye/{v1,v2,v3,v5,v6}/sig.txt`.
 
+**Honest re-ranking with background uncertainty (Z_syst).** The comparison above uses `Z_asimov`, which ignores the (large) DY MC-statistical uncertainty documented in the caveat. Re-running the full scan with `Z_syst` (Cowan Asimov + Gaussian background uncertainty + one-event Poisson floor on empty background bins — `Tools/wp_scan.py`) collapses the spread and moves the optima. Best working point picked on `Z_syst`, against the honest cut-based baseline (`Z_syst = 4.01`, itself down from `Z_asimov = 5.96`):
+
+| Model | Best WP (Z_syst) | Z_syst | vs cut (honest) | (old Z_asimov headline) |
+|-------|------------------|-------:|----------------:|------------------------:|
+| cut-based | — | 4.01 | — | 5.96 |
+| v1 (mass-included) | > 0.50 | 4.01 | +0.0 % | 6.42 |
+| v2 (mass-removed) | > 0.50 | 5.25 | +30.8 % | 6.90 |
+| v3 (planing) | > 0.70 | 4.65 | +15.9 % | 6.28 |
+| **v5_run2 (production)** | **> 0.80** | 4.91 | +22.3 % | 7.94 |
+| v6 (SR + planing) | > 0.95 | 4.56 | +13.7 % | 6.47 |
+| v7 (SR [110,140]) | > 0.70 | 4.77 | +18.9 % | 7.64 |
+| v8 (SR [120,130]) | > 0.55 | 4.92 | +22.5 % | 7.75 |
+| v9 (= v7, duplicate) | > 0.70 | 4.77 | +18.9 % | 7.64 |
+| v10 (SR [110,145]) | > 0.75 | 5.02 | +25.0 % | 8.76 |
+
+Four things follow. (i) The `Z_asimov` spread of 5.96–8.76 (×1.5) collapses to a `Z_syst` band of 4.0–5.2 — the cross-model/SR "instability" was mostly the ignored background uncertainty. (ii) v5_run2's headline "+33%" becomes **+22%** honest, and its optimum shifts 0.85 → 0.80 (the empty-DY-bin peak at 0.85–0.90 is penalized away). (iii) v1 correctly reads +0.0 % — it never rejects DY (score ≈ mass window, `B_flr` stays 3.5 at every WP), so it cannot beat the cut-based baseline. (iv) The good models (v2 5.25, v10 5.02, v8 4.92, v5 4.91) sit within ~0.3 of each other — i.e. **within the DY-driven uncertainty, they are not distinguishable**; ranking them requires more DY statistics (full Run2) first. Full output: `wp_scan_results.txt`. (v9 is byte-identical to v7 — likely a duplicated production, flagged for follow-up.)
+
 **Status.**
 
 v5_run2 is the production default. The deployment in SKNanoAnalyzer/`HiggsBDT.cc` applies the SR gate before ONNX inference and the per-WP mass histograms are filled in a single pass; the offline significance scan is `scripts/wp_scan.py` in the SKNanoAnalyzer repo. No further iteration is planned at the BDT level for the 4μ channel.
