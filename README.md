@@ -504,6 +504,31 @@ The v5_run2 model was deployed in SKNanoAnalyzer with the feature ordering verif
 
 Every BDT working point from 0.50 onward improves on the cut-based reference; the scan peaks at score > 0.85 with Z = 7.94, a **+33% improvement in significance** over the matched-selection cut-based baseline (Z = 5.96). The shape of the curve is the expected concave optimum: at low cuts background dominates the change; at very high cuts signal loss outpaces background rejection. The descent at 0.95 reflects insufficient MC statistics rather than a real optimum shift. The B-column drops at 0.80–0.90 partly because DY contributes zero events to those high-BDT histograms (the model rejects the reducible background almost entirely at tight cuts).
 
+**Background MC-statistics caveat (read the Z scan with this in mind).** The shape *and* level of the WP scan above are dominated by the effective MC statistics of the reducible backgrounds — DY above all. After the BDT cut, DY collapses to a handful of effective events (N_eff = (Σw)²/Σw²):
+
+| BDT cut | DY raw events | DY N_eff | DY Σw |
+|---------|---------------|----------|-------|
+| none | 83 | 40.9 | 158.9 |
+| > 0.50 | 3 | 3.0 | 7.74 |
+| > 0.60–0.70 | 2 | 2.0 | 4.95 |
+| > 0.75 | 1 | 1.0 | 2.44 |
+| > 0.80 | 0 | — | — (histogram absent) |
+
+The constant `B_err ≈ 3.5` seen across WP 0.50–0.70 in the raw scan is literally `√(w₁²+w₂²)` for the *same two* surviving DY events (each weight ≈ 2.5); at 0.75 one drops out, at 0.80 both are gone and `B_err` collapses to the pure-ZZ value (~0.1). The irreducible `ZZTo4L_powheg` is by contrast well-populated (705,314 raw events, N_eff ~ 10³–10⁵ at every cut) and stable; tt̄ has the same disease as DY but subdominant (6–12 events after the cut).
+
+Because `Z_asimov` above **ignores** the computed `B_err`, the numbers overstate the reach at loose cuts and the "peak" is partly an empty-MC-bin artifact. Propagating the background statistical uncertainty (Cowan Asimov-with-σ_b) gives:
+
+| WP | S | B | B_err | Z_asimov | Z_asimov + bkg unc. |
+|----|------|-------|-------|----------|---------------------|
+| > 0.50 | 27.77 | 11.98 | 3.50 | 6.31 | 3.94 |
+| > 0.70 | 27.03 | 10.69 | 3.50 | 6.41 | 3.83 |
+| > 0.75 | 26.44 | 7.70 | 2.44 | 6.99 | 4.58 |
+| > 0.80 | 25.61 | 4.57 | 0.12 | 7.92 | 7.89 |
+| > 0.85 | 23.64 | 3.59 | 0.12 | 7.94 | 7.90 |
+| > 0.90 | 18.42 | 1.89 | 0.10 | 7.72 | 7.66 |
+
+At loose cuts the honest significance is ~3.9, not 6.4. The tight-cut peak survives the penalty only because DY has *zero* MC events there — but zero MC events means the estimate ran out of simulation, not that the background vanished; assigning the empty bins even a one-event Poisson penalty pulls the > 0.80 point back toward ~4.6. The practical consequences: (i) the earlier "v2 mass-removed gives higher Z than v1" puzzle and (ii) the large Z swings under small signal-region changes (v5/v7/v8/v10) are both explained by this — not by overtraining or model instability, but by O(1–3) effective reducible-background events being reshuffled by any change. For model/SR comparison use AUC or a ZZ-only significance (the only statistically stable background); for a trustworthy Z, replace the raw DY/tt̄ MC counts with a data-driven reducible estimate and always propagate `B_err`. See [Known Limitations](#known-limitations).
+
 **Cross-model downstream comparison.** With the analyzer selection now matched, every model iteration was re-run through the same scan. The best working point (max Asimov Z with B ≥ 0.5) for each, against the common cut-based baseline Z = 5.96:
 
 | Model | Best WP | S | B | Asimov Z |
@@ -656,6 +681,7 @@ The export script (`scripts/export_onnx.py`) converts the model, strips the ZipM
 - **No PU reweighting** — pileup effects are not modeled at training time.
 - **No lepton scale factors** — muon ID/iso/trigger efficiencies are not corrected at training time. (Downstream SKNanoAnalyzer applies muon SFs at evaluation time.)
 - **Reducible backgrounds** — DY and tt̄ produce four-muon final states only through jet → μ fakes, which Delphes models poorly (see [madgraph README](https://github.com/siunkim0/madgraph#background-samples)). The +33% downstream improvement should be interpreted with this caveat: a fraction of the BDT's background-rejection gain comes from removing reducible-background events that may be mismodeled.
+- **Reducible-background MC statistics** — after the BDT cut, DY collapses to O(1–3) effective MC events (N_eff = 3 at score > 0.50, 0 above 0.80) and its ~2.5-weight events set the entire `B_err`. This, not overtraining or model instability, drives the counting-Z variation across model iterations (v2 vs v1) and signal-region variants (v5/v7/v8/v10). A trustworthy significance requires a data-driven reducible estimate and propagating `B_err` into Z — see the [v5_run2 background MC-statistics caveat](#v5_run2--production-model-run2--2018).
 - **LO cross sections** — all samples are generated at leading order.
 - **Single-category measurement** — the downstream comparison uses a single tight working point (score > 0.85) rather than a multi-category fit. A multi-category extension (loose / medium / tight bins each with an independent mass fit) is the standard CMS H→ZZ→4ℓ workflow and would further improve the combined significance. This was not pursued because the single-category result was already sufficient for the project's learning objectives.
 
