@@ -504,7 +504,20 @@ The v5_run2 model was deployed in SKNanoAnalyzer with the feature ordering verif
 
 Every BDT working point from 0.50 onward improves on the cut-based reference; the scan peaks at score > 0.85 with Z = 7.94, a **+33% improvement in significance** over the matched-selection cut-based baseline (Z = 5.96). The shape of the curve is the expected concave optimum: at low cuts background dominates the change; at very high cuts signal loss outpaces background rejection. The descent at 0.95 reflects insufficient MC statistics rather than a real optimum shift. The B-column drops at 0.80–0.90 partly because DY contributes zero events to those high-BDT histograms (the model rejects the reducible background almost entirely at tight cuts).
 
-**Background MC-statistics caveat (read the Z scan with this in mind).** The shape *and* level of the WP scan above are dominated by the effective MC statistics of the reducible backgrounds — DY above all. After the BDT cut, DY collapses to a handful of effective events (N_eff = (Σw)²/Σw²):
+**Background MC-statistics caveat (read the Z scan with this in mind).** The shape *and* level of the WP scan above are dominated by the effective MC statistics of the reducible backgrounds — DY above all. The per-sample inventory after skim (no BDT cut) makes the mismatch obvious — the yield-to-statistics ratio is catastrophic for DY and, to a lesser degree, tt̄:
+
+| Sample | Role | Raw events | Σw (yield) | N_eff | rel. stat. err |
+|--------|------|-----------:|-----------:|------:|---------------:|
+| ZZTo4L_powheg | irreducible bkg | 705,314 | 533.7 | ~697,000 | 0.12 % |
+| ggHToZZTo4L | signal | 36,432 | 28.16 | 36,180 | 0.5 % |
+| VBFHToZZTo4L | signal | 21,573 | 2.78 | 21,445 | 0.7 % |
+| **TTLL_powheg** | reducible bkg | 287 | 10.35 | 278 | 6 % |
+| **DY** | reducible bkg | **83** | **158.9** | **40.9** | **16 %** |
+| VHToNonbb | signal | 86 | 0.0005 | 17.8 | (negligible yield) |
+| VV / WZ / WW | diboson bkg | 7 / 6 / 1 | 2.76 / 2.34 / 0.41 | 7 / 6 / 1 | 38–100 % |
+| TTLJ_powheg | bkg | 1 | 0.047 | 1 | (negligible yield) |
+
+N_eff = (Σw)²/Σw². `DYJets` duplicates `DY`; `DYJets10to50` has zero 4μ survivors; `Muon`/`SingleMuon_*` are data (898 observed), not MC. Two disjoint regimes: ZZ (the *dominant* background) is also the most trustworthy (N_eff ~10⁵), while **DY carries the second-largest yield in the analysis on only 83 events** — a relative statistical error ~130× worse than ZZ *before* any cut. tt̄ is a smaller accomplice; the diboson/TTLJ rows are negligible in yield. After the BDT cut, DY collapses to a handful of effective events:
 
 | BDT cut | DY raw events | DY N_eff | DY Σw |
 |---------|---------------|----------|-------|
