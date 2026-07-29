@@ -1,0 +1,34 @@
+# Input ntuples for the flavor BDT.
+#
+# Produced by SKNanoAnalyzer `fake` with --userflags MakeTree --tag bdtflav.
+# Each ROOT file holds a flat TTree "mu": one row per loose muon in the
+# measurement region (see fake::fillTreeRow).
+#
+# Paths are machine-specific but not secret, so unlike the HZZ project this
+# file is committed as-is.
+
+ntuple_root: /gv0/Users/snuintern2/SKNanoOutput/fake/MakeTree
+
+# Quote these: bare 2017 / 2018 are parsed by YAML as integers, which made the
+# `era` column come out int64 for two eras and string for the other two, so
+# ak.concatenate produced a union type that parquet cannot write.
+eras:
+  - "2016preVFP"
+  - "2016postVFP"
+  - "2017"
+  - "2018"
+
+tag: bdtflav
+
+# MC samples to train on. `glob` is matched inside {ntuple_root}/{era}_{tag}/.
+mc:
+  QCD_MuEnriched:
+    glob: "QCD_Pt-*_MuEnriched.root"
+  TTLJ:
+    glob: "TTLJ_powheg.root"
+
+# Data — never used for training, only for input-feature data/MC comparison.
+# DoubleMuon comes out as one file per run period; skim.py globs them all.
+data:
+  DoubleMuon:
+    glob: "DoubleMuon*.root"

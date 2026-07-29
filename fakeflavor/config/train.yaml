@@ -1,0 +1,51 @@
+# Flavor BDT (b / c / uds / g) training configuration.
+
+train:
+  seed: 42
+  use_gpu: true
+  test_size: 0.20        # held-out test fraction
+  val_size: 0.20         # of the remaining train+val, for early stopping
+  feature_set: full      # "full" or "notag" (see fakeflavor/features.py)
+
+  # Weighting.
+  #   physical_weight: use the analyzer weight (lumi x xsec x SFs). This is the
+  #     weight the FR itself is measured with, so the training population then
+  #     matches the population the FR is applied to.
+  #   class_balance: rescale each class to the same total weight. The measured
+  #     mixture is roughly b : c : uds : g = 20 : 8 : 1 : 2 in QCD, and without
+  #     this the thin classes are never learned. It does bias the predicted
+  #     probabilities away from the physical priors — evaluate.py can undo that
+  #     with --prior-correct.
+  #   weight_clip_quantile: cap physical weights at this quantile within each
+  #     class. QCD pt-bin weights span ~6 orders of magnitude; a handful of
+  #     low-pt-bin events would otherwise dominate the loss entirely.
+  physical_weight: true
+  class_balance: true
+  weight_clip_quantile: 0.999
+
+  # Split by event id (run, lumi, evt) rather than by row. Two loose muons from
+  # the same event are correlated; splitting by row leaks between train and
+  # test. In this selection there is exactly one loose muon per event, so this
+  # is currently a no-op guard — keep it anyway, the selection may loosen.
+  split_by_event: true
+
+bdt:
+  n_estimators: 1000
+  max_depth: 6
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_weight: 10
+  gamma: 0.0
+  reg_lambda: 1.0
+  eval_metric: mlogloss
+  early_stopping_rounds: 40
+
+cv:
+  n_splits: 5
+
+evaluate:
+  # FR binning used by the muon fake-rate measurement — the classifier must be
+  # shown to add information *inside* these cells, not just rediscover them.
+  ptcorr_bins: [10., 12., 14., 17., 20., 30., 50., 100.]
+  abseta_bins: [0., 0.9, 1.6, 2.4]
