@@ -1,0 +1,48 @@
+# Direct route: P(tight | loose, x) trained as the fake rate itself.
+#
+# Separate from train.yaml because the weighting requirements are opposite. The
+# flavor classifier wants class balance and weight clipping so the thin light
+# classes are learned at all; this model's output *is* the FR, so anything that
+# distorts the weighted tight fraction distorts the answer.
+
+train:
+  seed: 42
+  use_gpu: true
+  test_size: 0.20
+  val_size: 0.20
+  feature_set: direct        # see fakeflavor/features.py — WP variables removed
+
+  # physical_weight: the FR is measured with the analyzer weight, so the model
+  #   must be fitted with it too, otherwise it converges to the unweighted tight
+  #   fraction (0.226 in QCD) instead of the weighted one (0.258).
+  # class_balance / weight_clip_quantile: forced off for target=tight by
+  #   train.py regardless of what is written here. Clipping is unnecessary in
+  #   any case — the top 0.1% of QCD rows by weight carry 1.4% of the total,
+  #   nothing like the 6-orders-of-magnitude spread that motivated it for the
+  #   per-flavor fit.
+  physical_weight: true
+  class_balance: false
+  weight_clip_quantile: null
+
+  split_by_event: true
+
+bdt:
+  n_estimators: 1000
+  max_depth: 6
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  # Raised from 10: with unclipped physical weights a single QCD low-pt-bin
+  # event carries w ~ 2e3, so a leaf holding "10" of weight can be one event.
+  min_child_weight: 1000.0
+  gamma: 0.0
+  reg_lambda: 1.0
+  eval_metric: logloss
+  early_stopping_rounds: 40
+
+cv:
+  n_splits: 5
+
+evaluate:
+  ptcorr_bins: [10., 12., 14., 17., 20., 30., 50., 100.]
+  abseta_bins: [0., 0.9, 1.6, 2.4]

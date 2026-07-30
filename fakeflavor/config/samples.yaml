@@ -28,7 +28,11 @@ mc:
     glob: "TTLJ_powheg.root"
 
 # Data — never used for training, only for input-feature data/MC comparison.
-# DoubleMuon comes out as one file per run period; skim.py globs them all.
+#
+# DoubleMuon comes out of the DAG as one file per run period (data hadd is not
+# part of the DAG), so `hadd DoubleMuon_*.root -> DoubleMuon.root` is a manual
+# step. Match ONLY the hadded file: a "DoubleMuon*.root" glob picks up the
+# hadded file *and* its own inputs and silently doubles every data row.
 data:
   DoubleMuon:
-    glob: "DoubleMuon*.root"
+    glob: "DoubleMuon.root"

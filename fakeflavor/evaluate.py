@@ -38,9 +38,38 @@ PLOT_DIR = Path("fakeflavor/plots")
 
 
 def load_model(model_path: Path):
+    """Load a saved model, restoring base_score explicitly.
+
+    xgboost 2.1.4 does not round-trip `base_score` through the sklearn wrapper:
+    the file stores the fitted value, but `XGBClassifier().load_model()` leaves
+    the booster configured at the constructor default 0.5 and reports no error.
+    For a *classifier* that is usually invisible, since a constant offset to the
+    margin does not change the ranking and therefore not the AUC. Here it is
+    fatal: the output of the direct model *is* the fake rate, so an offset of
+    logit(0.258) - logit(0.5) = -1.06 in the margin inflates every prediction.
+    Measured on QCD: sum_i w_i p_i / sum_{tight} w_i = 1.53 unpatched, 1.0029
+    patched, the latter being exactly the number train.py recorded in-memory.
+
+    Re-applying the value from the JSON is the fix; passing base_score= to the
+    constructor is not (load_model overwrites it).
+    """
     meta = json.loads(model_path.with_suffix(".meta.json").read_text())
     model = xgb.XGBClassifier()
     model.load_model(model_path)
+    saved = json.loads(Path(model_path).read_text())
+    base = saved["learner"]["learner_model_param"].get("base_score")
+    if base is not None:
+        vals = [float(v) for v in base.strip("[]").split(",")]
+        if len(vals) == 1:
+            model.get_booster().set_param("base_score", vals[0])
+        else:
+            # multi:softprob stores one intercept per class and set_param takes
+            # only a scalar. Harmless in practice for the flavor models (values
+            # are O(1e-3) against class priors of O(0.1)) and irrelevant to the
+            # prior-corrected outputs, but say so rather than pass silently.
+            log.warning("%s has a vector base_score %s that cannot be restored "
+                        "after load; per-class margins are offset by that much",
+                        model_path.name, vals)
     return model, meta
 
 

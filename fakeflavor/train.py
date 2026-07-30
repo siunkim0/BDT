@@ -1,8 +1,32 @@
-"""Phase 2: train the 4-class (b / c / uds / g) source-jet flavor BDT.
+"""Train either flavor BDT of the two routes.
+
+`--target flavor` (default) is the 4-class (b / c / uds / g) source-jet flavor
+classifier of Phase 1:
 
     python -m fakeflavor.train --config fakeflavor/config/train.yaml \
         --ntuples fakeflavor/data/ntuples/train.parquet \
         --out fakeflavor/data/models/flavor_full.json
+
+`--target tight` is the direct route: a binary model of P(tight | loose, x)
+whose calibrated output is used *as* the fake rate, replacing the FR(conePt,
+|eta|) lookup rather than reweighting it.
+
+    python -m fakeflavor.train --target tight \
+        --config fakeflavor/config/direct.yaml \
+        --ntuples fakeflavor/data/ntuples/QCD_MuEnriched.parquet \
+        --feature-set direct --out fakeflavor/data/models/direct.json
+
+Three differences matter for the direct target and are enforced below rather
+than left to the config:
+  * **no class balancing** — the output has to be a calibrated probability, and
+    rescaling the tight/loose classes to equal weight would shift it away from
+    the measured FR by construction;
+  * **no weight clipping** — for the same reason. The tail is affordable here:
+    the top 0.1% of QCD rows by weight carry only 1.4% of the total;
+  * training runs on **QCD alone**, not train.parquet. TTLJ is weightless next
+    to QCD (sum w 6.7e3 vs 7.8e8) so it contributes ~12 effective events, but
+    it is also the transfer/closure target, so it is excluded explicitly
+    instead of being harmlessly diluted.
 """
 from __future__ import annotations
 
@@ -22,6 +46,12 @@ from .features import CLASSES, FEATURE_SETS, N_CLASSES
 from src.utils import SEED, get_logger, load_yaml
 
 log = get_logger("fakeflavor.train")
+
+# --target -> (label column, class-code map). The direct target's "classes" are
+# just the two arms of the tight WP; they exist so the weighting and reporting
+# code below stays shared between the two routes.
+TARGET_COLUMN = {"flavor": "flavor", "tight": "isTight"}
+TARGET_CLASSES = {"flavor": CLASSES, "tight": {0: "loose", 1: "tight"}}
 
 
 def detect_gpu() -> bool:
@@ -47,12 +77,12 @@ def detect_gpu() -> bool:
         return False
 
 
-def load(parquet: Path, features: list[str]):
+def load(parquet: Path, features: list[str], target: str = "flavor"):
     arr = ak.from_parquet(parquet)
     X = np.column_stack([
         ak.to_numpy(arr[f]).astype(np.float32) for f in features
     ])
-    y = ak.to_numpy(arr["flavor"]).astype(np.int64)
+    y = ak.to_numpy(arr[TARGET_COLUMN[target]]).astype(np.int64)
     w = ak.to_numpy(arr["weight"]).astype(np.float64)
     meta = {k: ak.to_numpy(arr[k]) for k in ("run", "lumi", "evt", "mu_conept",
                                              "mu_abseta", "isTight",
@@ -61,8 +91,10 @@ def load(parquet: Path, features: list[str]):
     return X, y, w, meta
 
 
-def build_weights(y: np.ndarray, w_phys: np.ndarray, cfg: dict) -> np.ndarray:
+def build_weights(y: np.ndarray, w_phys: np.ndarray, cfg: dict,
+                  classes: dict | None = None) -> np.ndarray:
     """Physical weight -> training weight (clipped, optionally class-balanced)."""
+    classes = CLASSES if classes is None else classes
     w = w_phys.astype(np.float64).copy()
     if not cfg.get("physical_weight", True):
         w = np.ones_like(w)
@@ -70,17 +102,17 @@ def build_weights(y: np.ndarray, w_phys: np.ndarray, cfg: dict) -> np.ndarray:
     w = np.abs(w)
     q = cfg.get("weight_clip_quantile")
     if q:
-        for c in CLASSES:
+        for c in classes:
             m = y == c
             if m.sum() > 10:
                 cap = np.quantile(w[m], q)
                 n_clipped = int((w[m] > cap).sum())
                 w[m] = np.minimum(w[m], cap)
                 log.info("  class %-4s clipped %d/%d rows at w=%.4g",
-                         CLASSES[c], n_clipped, int(m.sum()), cap)
+                         classes[c], n_clipped, int(m.sum()), cap)
 
     if cfg.get("class_balance", True):
-        for c in CLASSES:
+        for c in classes:
             m = y == c
             s = w[m].sum()
             if s > 0:
@@ -121,20 +153,42 @@ def main() -> None:
     p.add_argument("--out", default="fakeflavor/data/models/flavor_full.json")
     p.add_argument("--feature-set", default=None,
                    help="override train.feature_set in the config")
+    p.add_argument("--target", default="flavor", choices=sorted(TARGET_COLUMN),
+                   help="'flavor' = 4-class source-jet flavor; "
+                        "'tight' = direct P(tight|loose,x) used as the FR")
     args = p.parse_args()
 
     cfg = load_yaml(args.config)
     tcfg = cfg["train"]
+    classes = TARGET_CLASSES[args.target]
+    n_classes = len(classes)
+    binary = args.target == "tight"
     fs_name = args.feature_set or tcfg.get("feature_set", "full")
     features = FEATURE_SETS[fs_name]
     seed = int(tcfg.get("seed", SEED))
-    log.info("Feature set '%s' (%d features)", fs_name, len(features))
+    log.info("Target '%s' (%d classes), feature set '%s' (%d features)",
+             args.target, n_classes, fs_name, len(features))
 
-    X, y, w_phys, meta = load(Path(args.ntuples), features)
-    for c, name in CLASSES.items():
-        log.info("  class %-4s %8d rows", name, int((y == c).sum()))
+    if binary:
+        # Not negotiable via config: both would decalibrate the output, which
+        # for this target *is* the fake rate. See the module docstring.
+        for k in ("class_balance", "weight_clip_quantile"):
+            if tcfg.get(k):
+                log.warning("target=tight: forcing %s off (was %r) — the output "
+                            "must stay a calibrated probability", k, tcfg[k])
+            tcfg[k] = False if k == "class_balance" else None
 
-    w = build_weights(y, w_phys, tcfg)
+    X, y, w_phys, meta = load(Path(args.ntuples), features, args.target)
+    for c, name in classes.items():
+        m = y == c
+        log.info("  class %-6s %8d rows  sum w = %.4g", name, int(m.sum()),
+                 float(np.abs(w_phys[m]).sum()))
+    if binary:
+        wa = np.abs(w_phys)
+        log.info("  measured inclusive FR = %.4f (weighted), %.4f (unweighted)",
+                 float(wa[y == 1].sum() / wa.sum()), float((y == 1).mean()))
+
+    w = build_weights(y, w_phys, tcfg, classes)
 
     if tcfg.get("split_by_event", True):
         tv, te = split_by_event(meta, y, float(tcfg["test_size"]), seed)
@@ -161,8 +215,8 @@ def main() -> None:
 
     model = xgb.XGBClassifier(
         **bdt_cfg,
-        objective="multi:softprob",
-        num_class=N_CLASSES,
+        **({"objective": "binary:logistic"} if binary else
+           {"objective": "multi:softprob", "num_class": N_CLASSES}),
         eval_metric=metric,
         early_stopping_rounds=early,
         device="cuda" if use_gpu else "cpu",
@@ -179,10 +233,42 @@ def main() -> None:
 
     proba = model.predict_proba(X[idx_te])
     aucs = {}
-    for c, name in CLASSES.items():
+    for c, name in classes.items():
+        if binary and c == 0:
+            continue    # one number, not two mirror-image ones
         aucs[name] = float(roc_auc_score((y[idx_te] == c).astype(int), proba[:, c],
                                          sample_weight=w[idx_te]))
-        log.info("Test one-vs-rest AUC  %-4s = %.4f", name, aucs[name])
+        log.info("Test one-vs-rest AUC  %-6s = %.4f", name, aucs[name])
+
+    if binary:
+        # The two things that decide whether this is usable as a fake rate.
+        #
+        # (1) Sum rule. sum_i w_i p(x_i) must reproduce sum_{i tight} w_i on the
+        #     held-out rows. This is the same-process closure: it can only fail
+        #     through miscalibration, so a deviation here invalidates any
+        #     cross-process closure number before it is measured.
+        # (2) Reliability. Predicted probability vs the weighted tight fraction
+        #     in bins of the prediction. This is the direct route's analogue of
+        #     the flavor route's leakage diagnostic -- except that here it is a
+        #     proper scoring rule, so it is expected to hold, and the point of
+        #     measuring it is to have the in-sample reference against which the
+        #     transfer sample can be judged.
+        wt, yt, pt = w[idx_te], y[idx_te], proba[:, 1]
+        pred, obs = float((wt * pt).sum()), float((wt * (yt == 1)).sum())
+        log.info("Test sum rule: predicted %.1f vs observed %.1f  -> %.4f",
+                 pred, obs, pred / obs)
+        log.info("Reliability (test):  %8s %8s %10s %10s",
+                 "p_lo", "p_hi", "<p>", "FR_obs")
+        qs = np.quantile(pt, np.linspace(0, 1, 11))
+        qs[0], qs[-1] = 0.0, 1.0
+        for lo, hi in zip(qs[:-1], qs[1:]):
+            m = (pt >= lo) & (pt < hi) if hi < 1.0 else (pt >= lo)
+            if not m.any():
+                continue
+            log.info("                     %8.4f %8.4f %10.4f %10.4f",
+                     lo, hi, float(np.average(pt[m], weights=wt[m])),
+                     float((wt[m] * (yt[m] == 1)).sum() / wt[m].sum()))
+        aucs["_sum_rule"] = pred / obs
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -192,9 +278,11 @@ def main() -> None:
     # Feature order is load-bearing for any downstream C++/ONNX consumer, so
     # persist it next to the model rather than relying on features.py matching.
     out.with_suffix(".meta.json").write_text(json.dumps({
+        "target": args.target,
+        "ntuples": str(args.ntuples),
         "feature_set": fs_name,
         "features": list(features),
-        "classes": {str(k): v for k, v in CLASSES.items()},
+        "classes": {str(k): v for k, v in classes.items()},
         "best_iteration": int(model.best_iteration),
         "test_auc_ovr": aucs,
         "train_config": tcfg,
@@ -212,15 +300,19 @@ def main() -> None:
     ax.axvline(model.best_iteration, color="grey", ls="--", lw=1, label="best")
     ax.set_xlabel("boosting round")
     ax.set_ylabel(metric)
-    ax.set_title(f"flavor BDT ({fs_name}) — mean OvR AUC {np.mean(list(aucs.values())):.4f}")
+    auc_vals = [v for k, v in aucs.items() if not k.startswith("_")]
+    ax.set_title(f"{args.target} BDT ({fs_name}) — "
+                 f"mean OvR AUC {np.mean(auc_vals):.4f}")
     ax.legend()
     ax.grid(alpha=0.3)
     fig.tight_layout()
     plot_dir = Path("fakeflavor/plots")
     plot_dir.mkdir(parents=True, exist_ok=True)
-    fig.savefig(plot_dir / f"training_history_{fs_name}.png", dpi=300)
+    tag = fs_name if args.target == "flavor" else f"{args.target}_{fs_name}"
+    fig.savefig(plot_dir / f"training_history_{tag}.png", dpi=300)
     plt.close(fig)
-    log.info("Saved training history to %s", plot_dir / f"training_history_{fs_name}.png")
+    log.info("Saved training history to %s",
+             plot_dir / f"training_history_{tag}.png")
 
 
 if __name__ == "__main__":
