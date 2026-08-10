@@ -4,6 +4,13 @@ Project guide for Claude Code. Read this first.
 
 **Update this file when making significant changes to the codebase (new files, architecture changes, new dependencies, changed conventions).**
 
+> **Second subproject: `fakeflavor/`** — a 4-class (b/c/uds/g) classifier for the
+> source jet of a fake muon, feeding the fake-rate measurement in
+> `/data6/Users/snuintern2/fake/`. Separate package, separate config, separate
+> venv (`fakeflavor/requirements.txt`); it reuses only `src/utils.py`
+> (`SEED`, `get_logger`, `load_yaml`, `detect_gpu`) and the conventions below.
+> See `fakeflavor/README.md`. Everything else in this file is the H→ZZ→4μ work.
+
 ## Project goal
 
 Train a binary classifier (signal vs background) on H→ZZ→4μ events using MC

@@ -18,7 +18,11 @@ eras:
   - "2017"
   - "2018"
 
-tag: bdtflav
+# bdtflav2 = bdtflav plus the 12 sv_* branches (IVF secondary vertex inside the
+# source jet). Same selection otherwise, so the two tags are row-for-row
+# comparable. The old bdtflav ntuples are left on disk; skim into a separate
+# --out directory if you want to keep both parquet sets side by side.
+tag: bdtflav2
 
 # MC samples to train on. `glob` is matched inside {ntuple_root}/{era}_{tag}/.
 mc:

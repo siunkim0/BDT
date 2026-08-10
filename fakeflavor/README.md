@@ -3,6 +3,10 @@
 A 4-class (b / c / uds / g) XGBoost classifier for the jet that produced a fake
 muon, trained on reconstructed quantities only so it can be applied to data.
 
+**See `RESULTS.md` for what came out** — every trained model with its AUCs, the
+settled physics conclusions, and the open items. This file is the *what and
+how*; that one is the *what happened*.
+
 ## Why
 
 `bkg.cc` estimates the fake background with a single 2D map
@@ -68,7 +72,10 @@ python -m fakeflavor.train    --feature-set notag --out fakeflavor/data/models/f
 python -m fakeflavor.evaluate --model fakeflavor/data/models/flavor_notag.json
 ```
 
-Three feature sets:
+The original three feature sets are below. `features.py` now defines **eight**
+(`full`, `notag`, `noml`, `slim`, `nowp`, `direct`, `direct_map`, `local`) and
+`train.py` **four** targets (`flavor`, `genflavor`, `tight`, `origin`) —
+`RESULTS.md` is the authoritative list of both, and of every trained model.
 
 | set | what it drops | what it measures |
 |---|---|---|

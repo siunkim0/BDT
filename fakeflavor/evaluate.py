@@ -10,9 +10,19 @@ Produces, on the held-out test set:
      to a flavor-weighted fake rate.
   6. **leakage diagnostic** — FR vs predicted-flavor probability within each
      *true* flavor. Must be flat; see the docstring of `leakage_check`.
-  7. sample transfer — train QCD / test TTLJ and back (needs --by-sample)
+     Flavor targets only.
 
     python -m fakeflavor.evaluate --model fakeflavor/data/models/flavor_full.json
+
+Target-aware since 2026-08-09: the label column, the class list and any row
+filter are read from the model's own `.meta.json`, so the same command scores a
+4-class flavor model, a binary `tight` model and a per-flavor `origin` model.
+Metas written before that date carry no `target` key and default to `flavor`,
+which is what they all were. Plot filenames key on the **model file stem**, not
+the feature set — two models sharing a feature set used to overwrite each other.
+
+Cross-process transfer (train QCD, test TTLJ) is not done here: pass a different
+`--ntuples` with `--all-rows`, or use `closure.py`, which is built for it.
 """
 from __future__ import annotations
 
@@ -29,7 +39,7 @@ import xgboost as xgb
 from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve
 
 from .features import CLASSES, N_CLASSES
-from .train import build_weights
+from .train import FLAVOR_SLICE, build_labels, build_weights
 from src.utils import get_logger, load_yaml
 
 log = get_logger("fakeflavor.evaluate")
@@ -85,16 +95,25 @@ def prior_correct(proba: np.ndarray, train_prior: np.ndarray,
     return adj / np.maximum(adj.sum(axis=1, keepdims=True), 1e-12)
 
 
-def cell_auc(y, proba, w, conept, abseta, ptbins, etabins) -> None:
+def cell_auc(y, proba, w, conept, abseta, ptbins, etabins,
+             classes: dict | None = None) -> None:
     """One-vs-rest AUC computed separately inside every FR cell.
 
     This is the question the whole study rests on: the flat FR map already
     knows (conePt, |eta|), so any discrimination the BDT provides *inside* a
     cell is genuinely new information. Cells with fewer than 50 rows of a class
     are reported as '-'.
+
+    Equally meaningful for the origin target, where it reads as: is QCD still
+    separable from ttbar *within* one cell of the map the fake rate is
+    currently binned in?
     """
+    classes = CLASSES if classes is None else classes
+    # For a binary target the two columns are mirror images (AUC_0 = 1 - AUC_1),
+    # so report only the positive class — same convention as the ROC block.
+    cols = [c for c in classes if not (len(classes) == 2 and c == 0)]
     log.info("--- one-vs-rest AUC inside each FR cell (conePt x |eta|)")
-    header = "  ".join(f"{CLASSES[c]:>5s}" for c in CLASSES)
+    header = "  ".join(f"{classes[c]:>5s}" for c in cols)
     log.info("  %-18s %-12s  %s   n", "conePt", "|eta|", header)
     for i in range(len(ptbins) - 1):
         for j in range(len(etabins) - 1):
@@ -103,7 +122,7 @@ def cell_auc(y, proba, w, conept, abseta, ptbins, etabins) -> None:
             if m.sum() < 100:
                 continue
             cells = []
-            for c in CLASSES:
+            for c in cols:
                 pos = (y[m] == c).sum()
                 if pos < 50 or pos == m.sum():
                     cells.append("    -")
@@ -116,7 +135,7 @@ def cell_auc(y, proba, w, conept, abseta, ptbins, etabins) -> None:
                      "  ".join(cells), int(m.sum()))
 
 
-def leakage_check(y, proba, w, is_tight, tag: str) -> None:
+def leakage_check(y, proba, w, is_tight, out_dir: Path) -> None:
     """FR vs predicted-flavor probability, within each TRUE flavor.
 
     Why this matters: `mu_miniiso`, `mu_sip3d`, `mu_tkreliso` and `mu_conept`
@@ -174,7 +193,7 @@ def leakage_check(y, proba, w, is_tight, tag: str) -> None:
     fig.suptitle("Leakage diagnostic — flat means the prediction is independent "
                  "of tightness at fixed true flavor")
     fig.tight_layout()
-    fig.savefig(PLOT_DIR / f"leakage_{tag}.png", dpi=300)
+    fig.savefig(out_dir / "leakage.png", dpi=300)
     plt.close(fig)
 
 
@@ -183,6 +202,9 @@ def main() -> None:
     p.add_argument("--model", default="fakeflavor/data/models/flavor_full.json")
     p.add_argument("--ntuples", default="fakeflavor/data/ntuples/train.parquet")
     p.add_argument("--config", default="fakeflavor/config/train.yaml")
+    p.add_argument("--plot-dir", default=str(PLOT_DIR),
+                   help="parent directory for this model's plot folder; see "
+                        "the same flag on train.py")
     p.add_argument("--prior-correct", action="store_true",
                    help="rescale probabilities back to the physical class mixture")
     p.add_argument("--all-rows", action="store_true",
@@ -194,15 +216,48 @@ def main() -> None:
     model_path = Path(args.model)
     model, meta = load_model(model_path)
     features = meta["features"]
-    tag = meta["feature_set"]
+    # One directory per model, named by the model file stem, with short file
+    # names inside. Keyed on meta["feature_set"] before 2026-08-09, which meant
+    # models sharing a feature set (QCD vs ttbar `full`, or the flavor slices of
+    # one origin arm) silently overwrote each other's plots — and 21 models
+    # writing 6 PNGs each into one flat directory was unreadable regardless.
+    # train.py puts its history PNG in the same directory.
+    tag = model_path.stem
+    out_dir = Path(args.plot_dir) / tag
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Target-aware. Metas written before 2026-08-09 carry no "target" key and
+    # are all 4-class reco-flavor models, which is the default.
+    target = meta.get("target", "flavor")
+    classes = {int(k): v for k, v in meta["classes"].items()}
+    n_classes = len(classes)
+    flavor_slice = meta.get("flavor_slice", "all")
+    log.info("Model %s: target '%s', %d classes %s, flavor slice '%s'",
+             model_path.name, target, n_classes, list(classes.values()),
+             flavor_slice)
 
     arr = ak.from_parquet(args.ntuples)
     X = np.column_stack([ak.to_numpy(arr[f]).astype(np.float32) for f in features])
-    y = ak.to_numpy(arr["flavor"]).astype(np.int64)
+    y = build_labels(arr, target)
     w = np.abs(ak.to_numpy(arr["weight"]).astype(np.float64))
     conept = ak.to_numpy(arr["mu_conept"])
     abseta = ak.to_numpy(arr["mu_abseta"])
     is_tight = ak.to_numpy(arr["isTight"]).astype(bool)
+
+    # The row filters train.py applied before splitting, replayed in the same
+    # order — otherwise the saved test indices point at the wrong rows.
+    if target == "genflavor":
+        keep = np.isin(y, list(classes))
+        X, y, w, conept, abseta, is_tight = (a[keep] for a in
+                                             (X, y, w, conept, abseta, is_tight))
+    if flavor_slice != "all":
+        keep = ak.to_numpy(arr["flavor"]) == FLAVOR_SLICE[flavor_slice]
+        if target == "genflavor":
+            raise NotImplementedError("genflavor + flavor slice not supported")
+        log.info("Replaying flavor slice '%s': %d rows", flavor_slice,
+                 int(keep.sum()))
+        X, y, w, conept, abseta, is_tight = (a[keep] for a in
+                                             (X, y, w, conept, abseta, is_tight))
 
     if not args.all_rows:
         split = np.load(model_path.with_suffix(".split.npz"))
@@ -214,12 +269,12 @@ def main() -> None:
     proba = model.predict_proba(X)
 
     if args.prior_correct:
-        train_prior = np.full(N_CLASSES, 1.0 / N_CLASSES)   # class_balance=true
-        true_prior = np.array([w[y == c].sum() for c in CLASSES])
+        train_prior = np.full(n_classes, 1.0 / n_classes)   # class_balance=true
+        true_prior = np.array([w[y == c].sum() for c in classes])
         true_prior /= true_prior.sum()
         proba = prior_correct(proba, train_prior, true_prior)
         log.info("Prior-corrected to physical mixture: %s",
-                 {CLASSES[c]: round(float(true_prior[c]), 4) for c in CLASSES})
+                 {classes[c]: round(float(true_prior[c]), 4) for c in classes})
 
     # 1. inclusive ROC.
     #
@@ -229,9 +284,11 @@ def main() -> None:
     # the number train.py prints; it is the one to compare across models,
     # because it does not move when the class mixture does. Curves are drawn
     # with `phys`.
-    w_bal = build_weights(y, w, cfg["train"])
+    w_bal = build_weights(y, w, cfg["train"], classes)
     fig, ax = plt.subplots(figsize=(5.5, 5))
-    for c, name in CLASSES.items():
+    for c, name in classes.items():
+        if n_classes == 2 and c == 0:
+            continue        # one number, not two mirror-image ones
         yb = (y == c).astype(int)
         auc = roc_auc_score(yb, proba[:, c], sample_weight=w)
         auc_bal = roc_auc_score(yb, proba[:, c], sample_weight=w_bal)
@@ -242,32 +299,32 @@ def main() -> None:
     ax.plot([0, 1], [0, 1], "k--", lw=0.8)
     ax.set_xlabel("false positive rate")
     ax.set_ylabel("true positive rate")
-    ax.set_title(f"flavor BDT ({tag}) — held-out test set")
+    ax.set_title(f"{target} BDT ({tag}) — held-out test set")
     ax.legend()
     ax.grid(alpha=0.3)
     fig.tight_layout()
-    fig.savefig(PLOT_DIR / f"roc_{tag}.png", dpi=300)
+    fig.savefig(out_dir / "roc.png", dpi=300)
     plt.close(fig)
 
     # 2. confusion matrix (row-normalized: P(predicted | true))
     pred = proba.argmax(axis=1)
-    cm = confusion_matrix(y, pred, labels=list(CLASSES), sample_weight=w)
+    cm = confusion_matrix(y, pred, labels=list(classes), sample_weight=w)
     cm = cm / np.maximum(cm.sum(axis=1, keepdims=True), 1e-30)
     fig, ax = plt.subplots(figsize=(5, 4.5))
     im = ax.imshow(cm, cmap="Blues", vmin=0, vmax=1)
-    names = [CLASSES[c] for c in CLASSES]
-    ax.set_xticks(range(N_CLASSES), names)
-    ax.set_yticks(range(N_CLASSES), names)
+    names = [classes[c] for c in classes]
+    ax.set_xticks(range(n_classes), names)
+    ax.set_yticks(range(n_classes), names)
     ax.set_xlabel("predicted")
     ax.set_ylabel("true")
-    for i in range(N_CLASSES):
-        for j in range(N_CLASSES):
+    for i in range(n_classes):
+        for j in range(n_classes):
             ax.text(j, i, f"{cm[i, j]:.2f}", ha="center", va="center",
                     color="white" if cm[i, j] > 0.5 else "black")
     ax.set_title(f"confusion ({tag}), row-normalized")
     fig.colorbar(im)
     fig.tight_layout()
-    fig.savefig(PLOT_DIR / f"confusion_{tag}.png", dpi=300)
+    fig.savefig(out_dir / "confusion.png", dpi=300)
     plt.close(fig)
     log.info("Confusion (P(pred|true)):\n%s", np.round(cm, 3))
 
@@ -281,15 +338,18 @@ def main() -> None:
     ax.set_xlabel("gain")
     ax.set_title(f"top 25 features by gain ({tag})")
     fig.tight_layout()
-    fig.savefig(PLOT_DIR / f"importance_{tag}.png", dpi=300)
+    fig.savefig(out_dir / "importance.png", dpi=300)
     plt.close(fig)
     log.info("Top 10 by gain: %s", [(k, round(v, 1)) for k, v in top[:10]])
 
     # 4. per-true-class score distributions
-    fig, axes = plt.subplots(1, N_CLASSES, figsize=(4 * N_CLASSES, 3.5))
-    for c, name in CLASSES.items():
+    # squeeze=False so a 2-class model still gets an indexable axes array.
+    fig, axes = plt.subplots(1, n_classes, figsize=(4 * n_classes, 3.5),
+                             squeeze=False)
+    axes = axes[0]
+    for c, name in classes.items():
         ax = axes[c]
-        for c2, name2 in CLASSES.items():
+        for c2, name2 in classes.items():
             m = y == c2
             ax.hist(proba[m, c], bins=40, range=(0, 1), weights=w[m],
                     histtype="step", density=True, label=f"true {name2}",
@@ -301,18 +361,22 @@ def main() -> None:
             ax.legend(fontsize=8)
     fig.suptitle(f"score distributions ({tag})")
     fig.tight_layout()
-    fig.savefig(PLOT_DIR / f"scores_{tag}.png", dpi=300)
+    fig.savefig(out_dir / "scores.png", dpi=300)
     plt.close(fig)
 
     # 5. the headline: does it add anything inside an FR cell?
     ecfg = cfg["evaluate"]
     cell_auc(y, proba, w, conept, abseta,
-             np.array(ecfg["ptcorr_bins"]), np.array(ecfg["abseta_bins"]))
+             np.array(ecfg["ptcorr_bins"]), np.array(ecfg["abseta_bins"]),
+             classes)
 
-    # 6. leakage
-    leakage_check(y, proba, w, is_tight, tag)
+    # 6. leakage. Defined against a TRUE FLAVOR — it asks whether the predicted
+    # flavor probability carries tightness information at fixed flavor — so it
+    # is meaningless for the origin and tight targets and is skipped there.
+    if target in ("flavor", "genflavor"):
+        leakage_check(y, proba, w, is_tight, out_dir)
 
-    log.info("Plots written to %s", PLOT_DIR)
+    log.info("Plots written to %s", out_dir)
 
 
 if __name__ == "__main__":

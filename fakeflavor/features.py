@@ -4,6 +4,15 @@
 so any C++/ONNX consumer must feed them in exactly this order. The HZZ side of
 this repo was already bitten once by a feature-ordering bug (see BDT/README.md).
 Append new features at the end; never reorder.
+
+One deliberate exception, 2026-08-09: `mu_pogTight` was **removed** from the
+middle of MUON_FEATURES rather than left in place, which shifts the positional
+index of every column after it. Every model trained before that date is
+therefore incompatible with this module and has to be retrained (the `_v3`
+generation) or read through its own `.meta.json`, which records the exact
+feature list it was fitted with — `evaluate.py` already does the latter. Nothing
+downstream breaks because no C++/ONNX consumer of the flavor models exists;
+`bkg.cc` reads a TH2D, not a booster.
 """
 from __future__ import annotations
 # Class codes as written by fake::FlavorCode. 4 (pileup) and -1 (unmatched)
@@ -37,7 +46,13 @@ MUON_FEATURES = [
     "mu_segmentComp", "mu_nStations", "mu_nTrkLayers",
     "mu_mvaTTH", "mu_mvaLowPt", "mu_softMva",
     "mu_tightCharge",
-    "mu_isGlobal", "mu_isStandalone", "mu_highPurity", "mu_pogTight",
+    # mu_pogTight removed 2026-08-09. It is the POG tight muon ID flag, and it
+    # was sitting in every set below including `nowp` and `direct`, the two
+    # whose entire purpose is to contain no tight-WP information. POG tight is
+    # not the analysis tight WP (that is `isTight` = POG medium + |SIP3D| < 3 +
+    # miniPFRelIso < 0.1) but it is a hard ID flag correlated with it, and it
+    # ranked 9th by gain in `slim` — too load-bearing to leave unexamined.
+    "mu_isGlobal", "mu_isStandalone", "mu_highPurity",
     "mu_jetPtRelv2", "mu_jetRelIso", "mu_jetNDauCharged",
 ]
 
@@ -73,17 +88,116 @@ EVENT_FEATURES = [
     "ev_nPV", "ev_nPVsGood", "ev_rho",
 ]
 
-FEATURES_FULL = MUON_FEATURES + JET_FEATURES + EVENT_FEATURES
+# Secondary vertex (IVF) reconstructed inside the source jet, added in the
+# `bdtflav2` ntuple. The SV with the largest decay-length significance within
+# dR < 0.4 of the jet axis is taken as the representative one; sentinels mark
+# the ~75% of rows with no SV at all and become NaN in the skim.
+#
+# Motivation: the flat 4-class model is capped by two separate walls. uds-vs-g
+# is at its information ceiling (dedicated binary AUC 0.693 vs 0.670 for the
+# single best feature) and no Run 2 variable will move it. b-vs-c is not
+# (0.840 vs 0.780 for jet_deepjet_cvb) — the BDT is still extracting +0.06
+# there, so that is where new information can pay. B and C hadrons differ in
+# exactly what an SV measures: mass (~5 vs ~2 GeV), track multiplicity, and
+# flight distance. DeepJet uses SVs internally but exposes only three numbers,
+# so the raw variables are not redundant with it.
+#
+# Appended at the END of FEATURES_FULL, not inside JET_FEATURES: inserting
+# there would shift every EVENT_FEATURES column and break the positional
+# contract this module's docstring is about.
+SV_FEATURES = [
+    "sv_n",                                 # matched SVs in the jet cone
+    "sv_masssum",                           # Σ mass over all matched SVs
+    "sv_mass", "sv_pt", "sv_ptratio",       # leading SV (max dlenSig)
+    "sv_dlensig", "sv_dxysig", "sv_pangle", "sv_chi2", "sv_ntracks",
+    "sv_dr_jet", "sv_dr_mu",
+]
+
+FEATURES_FULL = MUON_FEATURES + JET_FEATURES + EVENT_FEATURES + SV_FEATURES
 
 # Flavor taggers evaluated on the muon's *own* jet encode almost the same
 # information as Jet_hadronFlavour, i.e. very nearly the label itself, and are
 # the inputs most likely to be mismodeled in data. Train a second model without
 # them so the data/MC risk of the headline result can be judged.
+#
+# The sv_* block belongs here too: raw SV variables are flavor-tagging inputs
+# in their own right, so leaving them in would stop `notag` from being a
+# genuine no-flavor-tagging control.
 TAGGER_FEATURES = [
     "jet_deepjet_b", "jet_deepjet_cvb", "jet_deepjet_cvl", "jet_deepjet_qg",
     "jet_qgl",
-]
+] + SV_FEATURES
 FEATURES_NOTAG = [f for f in FEATURES_FULL if f not in TAGGER_FEATURES]
+
+# One rule: **no output of another ML model is an input to this one.**
+#
+# Motivation is data/MC robustness rather than leakage. On the 86-feature model
+# the top four features by gain are jet_deepjet_b, mu_softMva, jet_deepjet_cvl
+# and jet_deepjet_cvb — ~29% of the total gain sits in four numbers that are
+# themselves network outputs, each with its own training sample, its own
+# mismodeling, and its own calibration. `noml` asks what survives without them.
+#
+# Differs from `notag` in both directions, so they are not nested:
+#   * `notag` drops the whole sv_* block; `noml` KEEPS it. Vertex mass, flight
+#     significance and track count are raw reconstructed quantities, not
+#     scores, and with the taggers gone they are the only b/c handle left.
+#   * `notag` keeps the three muon MVAs; `noml` drops them. mvaTTH, mvaLowPt
+#     and softMva are network outputs like any other — softMva alone is rank 2
+#     by gain.
+# jet_puIdDisc is the pileup-ID BDT output and goes too, together with
+# jet_loosePuId, which is just a threshold on it. jet_tightId stays: cut-based,
+# not learned.
+ML_OUTPUT_FEATURES = [
+    "jet_deepjet_b", "jet_deepjet_cvb", "jet_deepjet_cvl", "jet_deepjet_qg",
+    "jet_qgl", "jet_puIdDisc", "jet_loosePuId",
+    "mu_mvaTTH", "mu_mvaLowPt", "mu_softMva",
+]
+FEATURES_NOML = [f for f in FEATURES_FULL if f not in ML_OUTPUT_FEATURES]
+
+# `noml` trimmed to the features that actually earned their place. Its gain is
+# concentrated — top 25 carry 65.9% of it, ranks 51-76 only 14.6%, and
+# mu_tightCharge was never split on at all — so this set asks what the long
+# tail was worth.
+#
+# Two provenances, deliberately kept visible:
+#   * the first 25 are the top 25 by GAIN of `flavor_noml_qcd`, read off the
+#     saved booster on 2026-08-04, **minus `mu_pogTight`** — which ranked 9th
+#     and was dropped deliberately on 2026-08-09 (see the MUON_FEATURES
+#     comment), leaving 24. Do not "restore" it from the old gain ranking: it
+#     is gone from FEATURES_FULL, so the subset assert below would fail anyway.
+#     Gain came from the trees, which saw only the training split, so val/test
+#     were never used to choose features.
+#   * the last 8 were named by hand as physically motivated kinematics that the
+#     gain ranking had dropped. None of them was already in the top 25.
+#     "jet eta" is jet_abseta — jet_eta is in EXCLUDED, see the comment there.
+#
+# A literal list, not a computed one: this module must not depend on a trained
+# model existing on disk. Regenerate by re-reading the booster if the parent
+# model is ever retrained.
+_SLIM_TOP25 = [
+    "sv_masssum", "sv_mass", "mu_highPurity", "sv_pangle", "jet_nmuons",
+    "sv_ptratio", "sv_ntracks", "mu_segmentComp", "mu_miniiso",
+    "mu_ip3d", "sv_dr_jet", "mu_miniiso_neu", "sv_pt", "mu_sip3d",
+    "mu_nStations", "mu_pfiso04", "sv_dlensig", "mu_conept", "jet_muEF",
+    "mu_jetPtRelv2", "mu_ptErr", "mu_jetNDauCharged", "mu_jetRelIso",
+    "sv_dxysig",
+]
+_SLIM_ADDED = [
+    "mu_pt", "mu_abseta", "mu_dxy",
+    "jet_nconst", "jet_abseta", "jet_dr_mu",
+    "ev_met", "ev_mt",
+]
+_SLIM_SET = set(_SLIM_TOP25) | set(_SLIM_ADDED)
+# Ordered like every other set, so a model's columns stay in FEATURES_FULL
+# order regardless of which set it was trained on.
+FEATURES_SLIM = [f for f in FEATURES_FULL if f in _SLIM_SET]
+# Fail loudly on a typo rather than silently training on a smaller set.
+# 32, not 33, since 2026-08-09: mu_pogTight left the top-25 half of the list.
+assert len(FEATURES_SLIM) == 32, (
+    f"FEATURES_SLIM has {len(FEATURES_SLIM)}, expected 32; unknown name(s): "
+    f"{sorted(_SLIM_SET - set(FEATURES_FULL))}")
+assert not set(FEATURES_SLIM) - set(FEATURES_NOML), \
+    "FEATURES_SLIM must stay a subset of FEATURES_NOML (no ML outputs)"
 
 # Variables that define the tight WP (the FR numerator) or track it closely.
 # The tight WP is |SIP3D| < 3 and miniPFRelIso < 0.1 on top of POG medium ID,
@@ -166,6 +280,10 @@ TIGHT_WP_VARS = [
     "mu_mvaTTH", "mu_mvaLowPt", "mu_softMva",
 ]
 FEATURES_DIRECT = [f for f in FEATURES_FULL if f not in TIGHT_WP_VARS]
+# NOTE: mu_pogTight used to survive this filter and sat inside `direct` and
+# `nowp` — a hard muon-ID flag in the two sets defined by having no tight-WP
+# information. It left FEATURES_FULL on 2026-08-09, so both sets lost it for
+# free, and **every direct_* model on disk predates that** and is stale.
 
 # The existing flat map expressed as a feature set: a direct model on these two
 # inputs must reproduce FR2D within statistics, which is what makes it the
@@ -175,12 +293,35 @@ FEATURES_DIRECT = [f for f in FEATURES_FULL if f not in TIGHT_WP_VARS]
 # reliability, versus 0.958-0.973 once a pt proxy is added back.
 FEATURES_DIRECT_MAP = ["mu_conept", "mu_abseta"]
 
+# ---------------------------------------------------------------------------
+# The origin route:  P(ttbar | QCD or ttbar, x)  at fixed true flavor.
+# ---------------------------------------------------------------------------
+# `--target origin` asks whether a fake from a *b* jet in ttbar is a different
+# object from a fake from a b jet in QCD (and likewise for c, uds, g). The point
+# is not the classifier: it is that per-flavor FR was measured NOT to be
+# sample-universal (RESULTS.md §7 — FR_c 0.4507 in QCD vs 0.3540 in TTLJ at Mu8
+# [10,12)x[0,0.9)), and the whole flavor-weighted route died on that. This
+# measures how large the process difference is and which variables carry it.
+#
+# The 14 ev_* variables answer a much easier and different question — ttbar
+# events have more jets, more HT and a harder away jet, so a model given them
+# tags the *process* and says nothing about the fake. `local` keeps only what is
+# measured on the muon and on its own source jet, so separation here means the
+# fake object itself differs. Read it against the `direct_map` arm (conePt,
+# |eta| only), which is the part the existing flat FR map already absorbs.
+FEATURES_LOCAL = MUON_FEATURES + JET_FEATURES + SV_FEATURES
+assert not set(FEATURES_LOCAL) - set(FEATURES_FULL), \
+    "FEATURES_LOCAL must stay a subset of FEATURES_FULL"
+
 FEATURE_SETS = {
     "full": FEATURES_FULL,
     "notag": FEATURES_NOTAG,
+    "noml": FEATURES_NOML,
+    "slim": FEATURES_SLIM,
     "nowp": FEATURES_NOWP,
     "direct": FEATURES_DIRECT,
     "direct_map": FEATURES_DIRECT_MAP,
+    "local": FEATURES_LOCAL,
 }
 
 # Branches present in the ntuple that are deliberately NOT features:

@@ -3,6 +3,14 @@
 train:
   seed: 42
   use_gpu: true
+  # 64 / 16 / 20. train.py splits off test_size first, then val_size OF THE
+  # REMAINDER, so 0.20 / 0.20 gives 0.20 test, 0.16 val, 0.64 train.
+  #
+  # Briefly ran at 0.25 / 0.3333333 (= 50/25/25) on 2026-08-04 to follow
+  # ref/2511.06972v2-2.pdf §3.2. Reverted the same day: it moved test AUC by
+  # -0.0002 / -0.0013 / -0.0006 on slim / no-ML / with-ML and left the
+  # train-test gap slightly WORSE (+0.008), so it bought nothing. Margins are
+  # small either way; 64/16/20 wins on both measures.
   test_size: 0.20        # held-out test fraction
   val_size: 0.20         # of the remaining train+val, for early stopping
   feature_set: full      # "full" or "notag" (see fakeflavor/features.py)
@@ -37,9 +45,23 @@ bdt:
   colsample_bytree: 0.8
   min_child_weight: 10
   gamma: 0.0
+  # NOT set to the paper's 1e-5: that is AdamW weight decay on network
+  # parameters, which has no correspondence to L2 on leaf weights. Copying the
+  # number would effectively remove regularization.
   reg_lambda: 1.0
   eval_metric: mlogloss
-  early_stopping_rounds: 40
+  # 40 -> 60 so the plateau schedule below has room to act before the run is
+  # cut: the first LR reduction lands at 20 stagnant rounds.
+  early_stopping_rounds: 60
+
+  # ref/2511.06972v2-2.pdf §3.2. Optional block — omit it (as direct.yaml does)
+  # and the callback is never constructed. `patience` is in boosting rounds,
+  # not epochs; see the ReduceLROnPlateau docstring in train.py.
+  lr_plateau:
+    enabled: true
+    factor: 0.5
+    patience: 20
+    min_lr: 0.005
 
 cv:
   n_splits: 5

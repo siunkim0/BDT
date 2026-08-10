@@ -1,0 +1,60 @@
+# Origin route: binary QCD vs ttbar at FIXED true source-jet flavor.
+#
+# Run with `--target origin --flavor {b,c,uds,g}` on train.parquet (QCD ⧺ TTLJ).
+# The question is not "can we tag the process" — it is whether the *fake object*
+# differs between processes at fixed flavor, which is the observable behind the
+# non-universality of the per-flavor FR recorded in RESULTS.md §7
+# (FR_c 0.4507 in QCD vs 0.3540 in TTLJ at Mu8 [10,12) x [0,0.9), -21%).
+#
+# Separate from train.yaml because the weighting is a different problem: there
+# the classes are flavors within one process, here they are two processes whose
+# physical weights differ by five orders of magnitude.
+
+train:
+  seed: 42
+  use_gpu: true
+  test_size: 0.20
+  val_size: 0.20
+  feature_set: full
+
+  # physical_weight: keep each process's own pT / pileup spectrum physical, so
+  #   the comparison is between the two populations as they actually occur.
+  # class_balance: THE load-bearing setting here. QCD sum(w) = 7.4e8 vs TTLJ
+  #   6.7e3 — a factor 1.1e5. Without it the fit sees roughly a dozen effective
+  #   ttbar events and learns nothing. Balancing normalizes the two processes to
+  #   equal total weight while leaving each one's internal shape untouched.
+  #   Note this makes the output an odds ratio under a 50/50 prior, not a
+  #   physical P(ttbar) — irrelevant, since AUC is what is being read.
+  # weight_clip_quantile: unchanged from train.yaml. The 12 QCD pt bins still
+  #   span ~6 orders of magnitude in weight and would otherwise dominate the
+  #   QCD arm entirely.
+  physical_weight: true
+  class_balance: true
+  weight_clip_quantile: 0.999
+
+  split_by_event: true
+
+bdt:
+  n_estimators: 1000
+  max_depth: 6
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_weight: 10
+  gamma: 0.0
+  reg_lambda: 1.0
+  eval_metric: logloss        # binary target, not mlogloss
+  early_stopping_rounds: 60
+  # No lr_plateau block, deliberately: RESULTS.md §5 shows the schedule is a
+  # structural no-op (the first LR drop always lands `patience` rounds AFTER
+  # best_iteration, and the model is truncated there).
+
+cv:
+  n_splits: 5
+
+evaluate:
+  # Same FR binning as everywhere else. For this target the per-cell table says
+  # whether the QCD/ttbar difference is concentrated at low conePt, where the
+  # fake background actually lives.
+  ptcorr_bins: [10., 12., 14., 17., 20., 30., 50., 100.]
+  abseta_bins: [0., 0.9, 1.6, 2.4]

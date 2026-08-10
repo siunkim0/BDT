@@ -1,6 +1,6 @@
 """Phase 1: turn the SKNanoAnalyzer `mu` ntuples into training parquet.
 
-Reads /gv0/.../SKNanoOutput/fake/MakeTree/{era}_bdtflav/*.root, applies the
+Reads /gv0/.../SKNanoOutput/fake/MakeTree/{era}_{tag}/*.root, applies the
 measurement-region selection and the Mu8/Mu17 trigger stitch, and writes one
 parquet per (sample, era) plus a combined file.
 
@@ -74,8 +74,12 @@ def derive(arr: ak.Array) -> ak.Array:
     """
     arr["jet_abseta"] = np.abs(ak.to_numpy(arr["jet_eta"]))
 
+    # sv_* gets the same treatment as jet_*: ~75% of rows have no secondary
+    # vertex in the jet cone and carry the sentinel, which is genuinely
+    # "missing", not "far away on the SV axis". sv_n and sv_masssum are exempt
+    # in practice because they are 0, not sentinel, when there is no SV.
     for field in arr.fields:
-        if not field.startswith("jet_"):
+        if not (field.startswith("jet_") or field.startswith("sv_")):
             continue
         v = ak.to_numpy(arr[field])
         if v.dtype == bool:

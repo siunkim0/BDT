@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.venv-fakeflavor/
 venv/
 .pytest_cache/
 
@@ -18,6 +19,8 @@ data/models/*.json
 data/models/*.onnx
 data/models/*.csv
 data/models/*.txt
+fakeflavor/data/
+fakeflavor/plots/
 *.root
 
 # Outputs (CMS-derived plots/results — restricted for publishing)
