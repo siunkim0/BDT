@@ -275,6 +275,7 @@ runs, shape geometry) and the PDFs were rendered page-by-page with `pymupdf`.
 | `qcd_paper/` | 48 | the §3.2 / 50-25-25 protocol run |
 | `qcd_v2/` | 48 | three arms at 64/16/20 + input appendix |
 | **`flavor_v3/`** | **46 / 46 / 64** | **current: three decks in the qcd_v2 format — QCD, ttbar, QCD-vs-ttbar (§12-14)** |
+| **`origin_cells/`** | **184** | **current: QCD-vs-ttbar one FR cell at a time (§15). The full body block runs for both global arms and all 24 (flavour, cell) pairs, which is most of the page count. Built by `flavor_v3/deck_figs.py` + `make_decks.py`, lands here** |
 
 Per-model plots moved out of the flat `plots/` directory on 2026-08-09: one
 directory per model, `<run>/models/<model>/{roc,confusion,importance,scores,
@@ -572,3 +573,174 @@ untouched: that route died on its *ceiling* with truth flavour (1.127 vs the
 flat map's 1.095), and better flavour information cannot fix a ceiling. §14 is
 an explanation of *why* the per-flavour maps failed to transfer, not a route
 back.
+
+**Followed up in §15**, which asks the same question one FR cell at a time with
+a model trained inside each cell, so it cannot borrow separation from the cell
+boundary.
+
+---
+
+## 15. **NEW** — the same question, one fake-rate cell at a time
+
+§14 conditioned on the analysis binning by *evaluating* the inclusive model
+inside each cell. That leaves one loophole: `mu_conept` is that model's top
+feature by a factor of four, so part of what it reads inside a wide cell is
+still conePt. §15 closes it by **training a separate model inside every cell**,
+on a coarse binning chosen so each cell is an exact union of analysis cells:
+
+- conePt **[10,20) [20,30) [30,50) [50,100)** — `[20,30)`, `[30,50)`, `[50,100)`
+  are analysis bins verbatim, `[10,20)` is the union of the four below 20.
+- |eta| **[0,0.9) [0.9,1.6) [1.6,2.4)**
+- **b and c only.** uds and g were dropped for statistics before the run: no
+  cell holds 50 ttbar rows of either.
+
+48 models (2 flavours x 12 cells x {`slim` 32, `direct_map` 2}) plus a
+re-evaluation of the six inclusive arms in the new bins. New machinery:
+`train.py --cell 'ptlo,pthi,etalo,etahi'`, applied **before** `build_weights`
+and the split so the class balance and the weight clip are computed within the
+cell, and replayed by `evaluate.py` from `meta["cell"]` before the saved test
+indices are applied. `config/origin_cells.yaml` differs from `origin.yaml`
+**only** in the `evaluate` binning.
+
+AUC for the TT class, physically weighted (the same normalisation as every
+per-cell table — **not** comparable to the class-balanced headline numbers of
+§14):
+
+| | b: trained | b: global | b: floor | c: trained | c: global | c: floor |
+|---|---|---|---|---|---|---|
+| [10,20) x [0,0.9) | .663 | .674 | .564 | .606 | .650 | .546 |
+| [10,20) x [0.9,1.6) | .667 | .668 | .561 | .626 | .635 | .519 |
+| [10,20) x [1.6,2.4) | .651 | .674 | .563 | .596 | .612 | .525 |
+| [20,30) x [0,0.9) | .661 | .666 | .541 | .620 | .625 | .497 |
+| [20,30) x [0.9,1.6) | .658 | .675 | .537 | .599 | .634 | .490 |
+| [20,30) x [1.6,2.4) | .650 | .663 | .547 | .612 | .640 | .517 |
+| [30,50) x [0,0.9) | .655 | .672 | .569 | .601 | .633 | .495 |
+| [30,50) x [0.9,1.6) | .661 | .683 | .580 | .595 | .638 | .537 |
+| [30,50) x [1.6,2.4) | .670 | .675 | .588 | .579 | .621 | .526 |
+| [50,100) x [0,0.9) | .633 | .650 | .594 | **.485** | .586 | .501 |
+| [50,100) x [0.9,1.6) | .626 | .655 | .566 | **.485** | .663 | .530 |
+| [50,100) x [1.6,2.4) | .651 | .645 | .574 | — | — | — |
+
+`trained` = a model fitted only on that cell's rows. `global` = the inclusive
+`origin_{fl}_slim` of §14 scored on the same rows. `floor` = the same fit given
+only (conePt, |eta|), i.e. what the flat FR map already knows.
+
+**The answer, for b: yes, in all twelve cells.** 0.626–0.670, mean 0.654,
+against a floor of 0.537–0.594 (mean 0.565). The two processes differ inside
+every bin the fake rate is measured in, and the difference is not the conePt
+spectrum.
+
+**For c: yes below 50 GeV; above it the in-cell fits run out of statistics.**
+0.579–0.626 in the nine lower cells (mean gap over the floor +0.087). In
+`[50,100)` the in-cell fit returns 0.485 — i.e. nothing — but that is the fit
+failing, not a physics statement: those two models trained on **167 and 331**
+ttbar rows and early-stopped at boosting round **3** and **13**. The third cell
+of that row has 137 rows in all of Run 2 and cannot be scored at all. The global
+model's 0.586 / 0.663 stands there, with its own ±0.07 from 52–103 test rows.
+
+Three things worth keeping:
+
+1. **The gap over the floor is largest where the fake background lives.** For b
+   it runs +0.098 / +0.115 / +0.083 / +0.059 across the four conePt rows. The
+   QCD/ttbar difference is concentrated at low conePt, which is the *worse* case
+   for the matrix method.
+2. **The global model reads the same inside a cell** — trained minus global
+   averages **-0.013** on b, largest single deviation 0.029. So §14's 21-cell
+   table was not an artefact of fitting across cells, and the inclusive model
+   transfers to any binning. On c the same figure is -0.049, driven entirely by
+   `[50,100)`. **That deficit is training statistics, not leakage**:
+   corr(log ttbar training rows, trained − global) = **+0.641** over the 23
+   measurable cells, cells above 2,000 ttbar training rows average -0.013 and
+   cells below average -0.049, and `best_iteration` collapses from 46–159 in
+   the b cells to 13 and 3 in the two thin c cells. Where the cell-trained arm
+   has statistics it confirms the global number; where it does not, it is a
+   statistics readout and the global number is the better estimate.
+   *(Corrected 2026-08-12 — this was first written up as the global model
+   importing separation across the cell boundary, which the evidence above does
+   not support.)*
+3. **The floor is not 0.5 here, and that is the binning.** conePt/|eta| alone
+   gives 0.537–0.594 on b, against 0.486–0.551 in the narrow analysis bins.
+   Merging four bins into `[10,20)` leaves conePt with room to discriminate
+   inside the cell. Quote `trained − floor`, not `trained`.
+
+Checks that were run, all passed: every one of the 48 filter lines reproduces
+the parquet row count for its cell; every cell model's `.meta.json` carries
+`target`/`flavor_slice`/`cell` and a scalar `base_score`; every cell model's own
+per-cell table has exactly one populated row matching its inclusive AUC to
+<2e-3; and the nine coarse cells that are unchanged analysis bins **reproduce
+the values already logged in `plots/flavor_v3/eval.log` to three decimals**.
+
+Not covered: `conePt >= 100` (3.0% of the b slice, 3.8% of c), uds and g, and
+anything outside MC.
+
+### 15.1 The kinematic ablation chain — you cannot remove a variable by removing its column
+
+Run 2026-08-12 in two steps, and the second is the deck's third series. Both are
+inclusive per-flavour fits scored per cell, replacing the conePt/|eta|-only
+floor on the A slide.
+
+| arm | features | b (phys) | c (phys) | rank 1 by gain (b / c) |
+|---|---|---|---|---|
+| global `slim` | 32 | 0.7587 | 0.6725 | `mu_conept` 932 / 286 |
+| global `slim_nokin` | 30 | 0.7590 | 0.6713 | `mu_pt` 696 / 328 |
+| global `slim_nomukin` | 29 | 0.7583 | 0.6731 | `mu_ptErr` 412 / 177 |
+| global `slim_nomukin28` | **28** | **0.7567** | **0.6649** | **`jet_nconst` 386 / 206** |
+
+Each rung removes the variable that had just taken rank 1: `slim_nokin` drops
+`mu_conept` and `mu_abseta`, `slim_nomukin` drops `mu_pt`, `slim_nomukin28`
+drops `mu_ptErr`. **None of it changes anything.** Over four rungs the inclusive
+AUC moves by **-0.0020 on b** and **-0.0076 on c**; per cell, `nomukin28 −
+global` averages **-0.0085 on b** (max deviation 0.036) and **-0.0160 on c**
+(max 0.049, in the 52-test-row `[50,100)` cell).
+
+What moves is only which variable holds rank 1 by gain: **`mu_conept` → `mu_pt`
+→ `mu_ptErr` → `jet_nconst`** (with `sv_pt` right behind it at rank 2). The
+successor is always waiting, and the measured correlations on the true-b slice
+say in advance who it will be:
+
+| feature | \|r\| vs `mu_conept` | \|r\| vs `mu_abseta` | in the 28? |
+|---|---|---|---|
+| `mu_pt` | **0.988** (Spearman 0.969) | 0.068 | no |
+| `jet_abseta` | 0.078 | **0.996** | **yes** |
+| `mu_ptErr` | 0.724 | 0.065 | no |
+| `sv_pt` | **0.673** | 0.053 | **yes** |
+| `mu_jetNDauCharged` | 0.481 | 0.134 | **yes** |
+| `jet_nconst` | 0.387 | 0.154 | **yes** |
+
+**Why the peel can never work, measured directly.** An XGBoost regressor fitted
+on whatever survives each rung reconstructs the removed variables this well
+(200k rows of the b slice, 70/30 split, 150 trees, depth 6):
+
+| feature set | R²(`mu_conept`) | R²(`mu_abseta`) |
+|---|---|---|
+| 32 `slim` | 0.974 | 1.000 |
+| 30 | 0.971 | 0.997 |
+| 29 | 0.964 | 0.996 |
+| **28** | **0.959** | 0.996 |
+| 27 (also −`sv_pt`) | 0.961 | 0.996 |
+| 26 (also −`jet_abseta`) | 0.961 | **0.511** |
+
+**conePt is reconstructible at R² ≈ 0.96 no matter which proxy is removed.** It
+is not carried by any single column — it is distributed across the set — so
+removing its proxies one at a time cannot blind the model to it, and the flat
+AUC is the direct consequence. |eta| behaves oppositely: `jet_abseta` is its
+*sole* carrier, and dropping that one column takes R² from 0.996 to 0.511.
+(The regression split is by row, not by event, so these R² are marginally
+optimistic; the effect is far too large for that to matter.)
+
+So `slim_nomukin28` is **"no muon kinematic columns", not "no kinematics"** —
+|eta| is entirely untouched through `jet_abseta`, and conePt is 96%
+recoverable — and it must never be labelled otherwise on a plot.
+
+**The transferable lesson: an ablation removes a column, not the information.**
+In a feature set this correlated, "we removed X and the AUC did not move" is not
+evidence that X was unimportant. It applies to the `notag` and `nowp` ablations
+in §3 and §7 as much as here. Measure the correlations, watch what takes over
+rank 1, and if the question really is "what does this model know without the
+kinematics", **column-dropping is the wrong tool** — that needs decorrelation
+or an adversarial/planing approach, not a shorter feature list.
+
+The conePt/|eta|-only `direct_map` arm these replaced is still measured and
+still on record — 0.537–0.594 on b in these coarse cells against 0.486–0.551 in
+the narrow analysis bins — in `plots/origin_cells/runA.log` and `eval.log`. It
+is simply no longer on a slide.

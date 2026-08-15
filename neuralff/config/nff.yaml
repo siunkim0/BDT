@@ -1,0 +1,112 @@
+# Neural fake factor — arXiv:2511.06972, MC-only configuration.
+#
+# Only the paper's *ratio* classifier is configured here. The two subtraction
+# classifiers of their Fig. 3 exist to remove real-lepton contamination from
+# data; we train on MC and select gen-fakes with `isPrompt == False` in the
+# skim, so there is nothing to subtract.
+
+# Two arms of the paper's five observables, differing only in which pT.
+#
+# The rule that governs the choice: **no input may be a function of
+# miniPFRelIso or of SIP3D**, because those two define the tight WP. Since
+# conePt = pt x (1 + max(0, miniiso - 0.1)), the PAIR (mu_pt, mu_conept)
+# determines miniiso exactly — measured here, P(tight | conePt > pt) = 0.000000
+# — so the two must never appear together. Either one ALONE is admissible: with
+# no second pT to divide by, miniiso is not recoverable.
+#
+#  paper5   conePt. The variable the reference map is binned in, which is also
+#           what the paper does (their binned map and their network both use the
+#           electron pT). This is the arm to read for a conePt x |eta|
+#           comparison: a model that has never seen conePt cannot resolve the
+#           axis it is being plotted against. xgboost reference AUC 0.695, and
+#           the fail-side f stays intermediate (mean 0.20, p99 0.62, nothing
+#           above 0.95), so it is safe for the matrix method too.
+#  paper5_rawpt
+#           raw mu_pt, carrying no WP information at all. xgboost reference AUC
+#           0.577 — the difference between the two arms measures how much of the
+#           map's conePt dependence IS the working point. Read it as the control.
+default_set: paper5
+feature_sets:
+  paper5:
+    numerical: [mu_conept, mu_abseta, ev_met, ev_mt]
+    # Label-encoded and embedded. `era` is not a paper feature — it is how the
+    # four eras share one model (the paper's categorical-feature path).
+    categorical: [ev_njet40, era]
+  paper5_rawpt:
+    numerical: [mu_pt, mu_abseta, ev_met, ev_mt]
+    categorical: [ev_njet40, era]
+
+features:
+  # Values above this are clipped into the last category rather than creating a
+  # bin with three events in it.
+  njet_max: 6
+  # Winsorization quantile for the numerical features, fitted on the training
+  # split. Required once the MET/MT cut is off the ntuple: PUPPI MET has a
+  # pathological tail (max 1.0e7 GeV over the full QCD sample) that
+  # standardization cannot survive. Rows are clipped, never dropped, so they
+  # keep their weight in the loss and in the closure sum.
+  #
+  # 0.999, not 0.9999: the pathological tail is thick enough that the 0.9999
+  # quantile of ev_met is still 9.9 TeV, which leaves std = 134 and squeezes the
+  # 1-99% bulk into a z-span of 2.6. At 0.999 the cut is 690 GeV, std = 66, and
+  # the bulk spans 5.4 — twice the resolution where all the events are. 690 GeV
+  # is a generous physical ceiling for MET in a QCD fake-rate region, and f is
+  # flat out there anyway. conePt and mT are insensitive to the choice.
+  clip_quantile: 0.999
+
+model:
+  embed_dim: 32          # per-feature embedding width, mean-pooled to this
+  hidden_dim: 128        # paper: 128 neurons per layer
+  n_blocks: 4            # paper: four residual blocks
+  norm: none             # paper found BatchNorm did not help; 'batch' to re-enable
+  head: linear           # ratio classifier; 'softabs' is the subtraction head
+
+train:
+  seed: 42
+  device: cuda
+  # Paper: 50 / 25 / 25 train / val / test.
+  test_size: 0.25
+  val_size: 0.3333333333    # of the remaining 75% -> 25% of the total
+  split_by_event: true
+  batch_size: 1024
+  epochs: 100
+  lr: 3.0e-4
+  weight_decay: 1.0e-5
+  # Eq. 12's squared term on the logit. The paper writes it with a minus sign,
+  # which under minimization would *reward* exploding logits; implemented as a
+  # penalty. 0.01 for the ratio classifier, 0 for the subtraction ones.
+  reg_lambda: 0.01
+  lr_patience: 5         # ReduceLROnPlateau, factor 0.5
+  early_stopping_patience: 15
+
+# Binning of the reference map. Must stay identical to fake.cc's ptCorrBins /
+# absEtaBins and to the edges inside fr/fakerate_muon_*.json.
+binning:
+  ptcorr: [10., 12., 14., 17., 20., 30., 50., 100.]
+  abseta: [0., 0.9, 1.6, 2.4]
+  # What to do with conePt > 100.
+  #
+  # `drop` is REQUIRED to reproduce fr/*.json, and this was measured, not
+  # assumed: with the overflow clipped into [50,100] the last bin comes out
+  # 0.0584 / 0.0733 / 0.1083 against the official 0.0576 / 0.0725 / 0.1075
+  # (+1.4 / +1.1 / +0.7%), and dropping it reproduces all three to four
+  # decimals — while the other 18 bins agree exactly either way.
+  #
+  # Note this DISAGREES with fake.cc, which fills its histograms with
+  # min(ptCorr, 99.9) and therefore does put the overflow in the last bin. The
+  # reference maps predate that behaviour. `clip` reproduces the analyzer;
+  # `drop` reproduces the thing we are comparing against, so it is the default.
+  # It affects the binned baseline and the ML projection identically — both use
+  # the same cell assignment — and never affects training, which keeps every row.
+  overflow: drop
+
+compare:
+  # Official binned maps to overlay, by sample.
+  official_json: /data6/Users/snuintern2/fake/fr/fakerate_muon_{tag}.json
+  official_name:
+    QCD_MuEnriched: fakerate_muon_QCD_MuEnriched
+    TTLJ: fakerate_muon_TT
+  # Keys quoted deliberately: unquoted 2017/2018 are parsed as ints and the
+  # lookup by era string misses. compare.py now coerces both sides anyway.
+  era_tag: {"2016preVFP": "2016pre", "2016postVFP": "2016post",
+            "2017": "2017", "2018": "2018"}

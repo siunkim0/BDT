@@ -34,12 +34,26 @@ FLOAT_SENTINEL = -999.0
 INT_SENTINEL = -99
 
 
-def read_tree(path: Path) -> ak.Array:
+# Rows per read. Every cut below is row-wise, so chunking is exactly equivalent
+# to reading the file whole — it only bounds the peak memory. Needed since the
+# `nff` tag: with the MET/MT cut moved offline, TTLJ_powheg is 310M rows over
+# the four eras (134M in 2018 alone), and one `arrays()` call on that is ~56 GB
+# before awkward makes a single copy. At 2M rows the peak is ~1 GB per chunk,
+# and what survives the cuts is a small fraction of it.
+CHUNK_ROWS = 2_000_000
+
+
+def read_tree(path: Path):
+    """Yield (chunk, n_total) over the tree, or (None, 0) if it has no tree."""
     with uproot.open(path) as f:
         if TREE not in f:
             log.warning("%s has no tree '%s' — skipping", path, TREE)
-            return None
-        return f[TREE].arrays()
+            yield None, 0
+            return
+        t = f[TREE]
+        n = t.num_entries
+        for chunk in t.iterate(step_size=CHUNK_ROWS):
+            yield chunk, n
 
 
 def stitch(arr: ak.Array) -> ak.Array:
@@ -90,30 +104,44 @@ def derive(arr: ak.Array) -> ak.Array:
     return arr
 
 
-def skim_file(path: Path, era: str, sample: str, is_data: bool) -> ak.Array | None:
-    arr = read_tree(path)
-    if arr is None or len(arr) == 0:
+def skim_file(path: Path, era: str, sample: str, is_data: bool,
+              keep_all_flavors: bool = False) -> ak.Array | None:
+    n_raw = n_central = n_stitch = n_final = 0
+    kept = []
+    for chunk, _ in read_tree(path):
+        if chunk is None or len(chunk) == 0:
+            continue
+        n_raw += len(chunk)
+
+        # Central measurement region. The ntuple was written with the loosest
+        # away-jet cut (30 GeV) so that Central (40) and both away-jet
+        # systematics are offline cuts on the same rows.
+        arr = chunk[ak.to_numpy(chunk["ev_hasAway40"])]
+        n_central += len(arr)
+
+        arr = stitch(arr)
+        n_stitch += len(arr)
+
+        if not is_data:
+            # Fakes only: a prompt muon's 'source jet' is not a fake source.
+            arr = arr[~ak.to_numpy(arr["isPrompt"])]
+            if not keep_all_flavors:
+                # Keep the four trainable classes; drops pileup (4) and
+                # unmatched (-1).
+                flav = ak.to_numpy(arr["flavor"])
+                arr = arr[np.isin(flav, list(CLASSES))]
+        if len(arr) == 0:
+            continue
+        n_final += len(arr)
+        kept.append(derive(arr))
+
+    if not n_final:
+        log.info("  %-34s raw=%8d  away40=%8d  stitch=%8d  final=%8d",
+                 path.name, n_raw, n_central, n_stitch, n_final)
         return None
-    n_raw = len(arr)
 
-    # Central measurement region. The ntuple was written with the loosest
-    # away-jet cut (30 GeV) so that Central (40) and both away-jet systematics
-    # are offline cuts on the same rows.
-    arr = arr[ak.to_numpy(arr["ev_hasAway40"])]
-    n_central = len(arr)
-
-    arr = stitch(arr)
-    n_stitch = len(arr)
-
-    if not is_data:
-        # Fakes only: a prompt muon's 'source jet' is not a fake source.
-        arr = arr[~ak.to_numpy(arr["isPrompt"])]
-        # Keep the four trainable classes; drops pileup (4) and unmatched (-1).
-        flav = ak.to_numpy(arr["flavor"])
-        arr = arr[np.isin(flav, list(CLASSES))]
-    n_final = len(arr)
-
-    arr = derive(arr)
+    arr = kept[0] if len(kept) == 1 else ak.concatenate(kept)
+    del kept
     # str() is not redundant: an unquoted 2017 in the YAML arrives as an int,
     # which would make this column int64 for some eras and string for others —
     # ak.concatenate then builds a union type that parquet refuses to write.
@@ -122,7 +150,7 @@ def skim_file(path: Path, era: str, sample: str, is_data: bool) -> ak.Array | No
 
     log.info("  %-34s raw=%8d  away40=%8d  stitch=%8d  final=%8d",
              path.name, n_raw, n_central, n_stitch, n_final)
-    return arr if n_final else None
+    return arr
 
 
 def main() -> None:
@@ -131,6 +159,13 @@ def main() -> None:
     p.add_argument("--out", default="fakeflavor/data/ntuples")
     p.add_argument("--data", action="store_true",
                    help="also skim DoubleMuon (for data/MC input plots only)")
+    p.add_argument("--keep-all-flavors", action="store_true",
+                   help="do NOT drop pileup (flavor 4) and jet-unmatched "
+                        "(flavor -1) fakes. Required for a fake-RATE "
+                        "measurement (neuralff): the official map is measured "
+                        "over every gen-fake muon, so dropping ~3.3%% of them "
+                        "biases the denominator. The flavor classifier wants "
+                        "them gone, hence the default.")
     args = p.parse_args()
 
     cfg = load_yaml(args.config)
@@ -155,7 +190,7 @@ def main() -> None:
                 continue
             log.info("%s / %s: %d file(s)", sample, era, len(files))
             for f in files:
-                a = skim_file(f, era, sample, is_data)
+                a = skim_file(f, era, sample, is_data, args.keep_all_flavors)
                 if a is not None:
                     parts.append(a)
         if not parts:

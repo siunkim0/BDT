@@ -77,6 +77,13 @@ The original three feature sets are below. `features.py` now defines **eight**
 `train.py` **four** targets (`flavor`, `genflavor`, `tight`, `origin`) —
 `RESULTS.md` is the authoritative list of both, and of every trained model.
 
+`train.py` also takes two row filters, both applied **before** the weighting and
+the split so that the class balance and the weight clip are computed inside the
+selection: `--flavor {b,c,uds,g}` (a fixed true source flavour, §14) and
+`--cell 'ptlo,pthi,etalo,etahi'` (one FR cell, §15). `evaluate.py` replays both
+from the model's own `.meta.json` before applying the saved test indices, so
+scoring a sliced model needs no extra flags.
+
 | set | what it drops | what it measures |
 |---|---|---|
 | `full` | nothing | best achievable separation |

@@ -39,7 +39,7 @@ import xgboost as xgb
 from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve
 
 from .features import CLASSES, N_CLASSES
-from .train import FLAVOR_SLICE, build_labels, build_weights
+from .train import FLAVOR_SLICE, build_labels, build_weights, cell_mask
 from src.utils import get_logger, load_yaml
 
 log = get_logger("fakeflavor.evaluate")
@@ -232,9 +232,10 @@ def main() -> None:
     classes = {int(k): v for k, v in meta["classes"].items()}
     n_classes = len(classes)
     flavor_slice = meta.get("flavor_slice", "all")
-    log.info("Model %s: target '%s', %d classes %s, flavor slice '%s'",
+    cell = meta.get("cell")
+    log.info("Model %s: target '%s', %d classes %s, flavor slice '%s', cell %s",
              model_path.name, target, n_classes, list(classes.values()),
-             flavor_slice)
+             flavor_slice, cell or "-")
 
     arr = ak.from_parquet(args.ntuples)
     X = np.column_stack([ak.to_numpy(arr[f]).astype(np.float32) for f in features])
@@ -256,6 +257,16 @@ def main() -> None:
             raise NotImplementedError("genflavor + flavor slice not supported")
         log.info("Replaying flavor slice '%s': %d rows", flavor_slice,
                  int(keep.sum()))
+        X, y, w, conept, abseta, is_tight = (a[keep] for a in
+                                             (X, y, w, conept, abseta, is_tight))
+    if cell:
+        # After the flavor slice, because that is the order train.py applies
+        # them in. Built from the already-filtered conept/abseta locals, not
+        # from `arr`, for the same reason. `cell_mask` is imported from train.py
+        # rather than reimplemented so the two boundary conventions cannot
+        # drift apart by a row.
+        keep = cell_mask(conept, abseta, cell)
+        log.info("Replaying cell '%s': %d rows", cell, int(keep.sum()))
         X, y, w, conept, abseta, is_tight = (a[keep] for a in
                                              (X, y, w, conept, abseta, is_tight))
 

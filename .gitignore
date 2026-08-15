@@ -22,7 +22,8 @@ data/models/*.txt
 fakeflavor/data/
 fakeflavor/plots/
 *.root
-
+neuralff/data/
+neuralff/plots/
 # Outputs (CMS-derived plots/results — restricted for publishing)
 plots/*
 !plots/.gitkeep

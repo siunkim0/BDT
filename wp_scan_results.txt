@@ -1,0 +1,368 @@
+===================================================================
+ Working-point scan with honest significance (Z_syst)
+ Z_asimov = Asimov, ignores background uncertainty
+ Z_syst   = Asimov + Gaussian bkg uncertainty (Cowan 1007.1727)
+            + one-event Poisson floor on empty background bins
+ Generated: 2026. 07. 01. (수) 14:14:24 KST
+===================================================================
+
+###################################################################
+### model=bdt_v1_new
+###################################################################
+Info in <TCanvas::Print>: png file plots/wp_scan_model=bdt_v1_new.png has been created
+era=model=bdt_v1_new  window m4l in [120.0, 130.0] GeV
+
+one-event floor weights (mean MC weight, Sigma w / N_raw):
+  ZZ        0.001
+  DY        1.915
+  TTLL      0.036
+
+cut-based (H_Mass):
+  S =   28.374 +-  0.143
+  B =   14.873 +-  3.504 (stat)  +-  3.504 (floored)
+  Z_asimov =    5.964
+  Z_syst   =    4.013
+  Z1       =    7.357
+
+   WP         S         B    B_err    B_flr   Z_asimov    Z_syst        Z1
+----------------------------------------------------------------------------------
+ 0.50    28.354    14.229    3.504    3.504      6.054     4.013     7.517
+ 0.55    28.349    14.131    3.504    3.504      6.068     4.012     7.541
+ 0.60    28.338    14.028    3.504    3.504      6.081     4.011     7.566
+ 0.65    28.326    13.874    3.503    3.503      6.102     4.010     7.605
+ 0.70    28.311    13.676    3.503    3.503      6.130     4.008     7.655
+ 0.75    28.286    13.461    3.503    3.503      6.159     4.005     7.709
+ 0.80    28.251    13.212    3.503    3.503      6.192     4.000     7.772
+ 0.85    28.202    12.871    3.503    3.503      6.238     3.993     7.861
+ 0.90    28.078    12.321    3.503    3.503      6.308     3.974     7.999
+ 0.95    27.678    11.303    3.503    3.503      6.416     3.916     8.233
+
+best WP = 0.50  (Z_syst = 4.013, B >= 0.5)
+  vs cut-based Z_syst = 4.013  ->  BDT does NOT beat cut-based by -0.0% (honest, bkg-uncertainty folded in)
+
+wrote plots/wp_scan_model=bdt_v1_new.png
+
+###################################################################
+### model=bdt_v2_new
+###################################################################
+Info in <TCanvas::Print>: png file plots/wp_scan_model=bdt_v2_new.png has been created
+era=model=bdt_v2_new  window m4l in [120.0, 130.0] GeV
+
+one-event floor weights (mean MC weight, Sigma w / N_raw):
+  ZZ        0.001
+  DY        1.915
+  TTLL      0.036
+
+cut-based (H_Mass):
+  S =   28.374 +-  0.143
+  B =   14.873 +-  3.504 (stat)  +-  3.504 (floored)
+  Z_asimov =    5.964
+  Z_syst   =    4.013
+  Z1       =    7.357
+
+   WP         S         B    B_err    B_flr   Z_asimov    Z_syst        Z1
+----------------------------------------------------------------------------------
+ 0.50    27.192     8.641    0.128    1.919      6.896     5.249     9.250
+ 0.55    26.910     8.387    0.118    1.918      6.902     5.215     9.292
+ 0.60    26.509     8.164    0.118    1.918      6.876     5.162     9.278
+ 0.65    26.018     7.868    0.111    1.918      6.850     5.097     9.275
+ 0.70    25.362     7.495    0.104    1.917      6.811     5.007     9.264
+ 0.75    24.495     7.107    0.103    1.917      6.732     4.883     9.188
+ 0.80    23.288     6.599    0.096    1.917      6.612     4.706     9.066
+ 0.85    21.420     5.856    0.093    1.917      6.410     4.418     8.852
+ 0.90    18.084     4.611    0.078    1.916      6.014     3.866     8.422
+ 0.95    11.162     2.382    0.056    1.915      4.975     2.542     7.232
+
+best WP = 0.50  (Z_syst = 5.249, B >= 0.5)
+  vs cut-based Z_syst = 4.013  ->  BDT improves over cut-based by +30.8% (honest, bkg-uncertainty folded in)
+
+wrote plots/wp_scan_model=bdt_v2_new.png
+
+###################################################################
+### model=bdt_v3_new
+###################################################################
+Info in <TCanvas::Print>: png file plots/wp_scan_model=bdt_v3_new.png has been created
+era=model=bdt_v3_new  window m4l in [120.0, 130.0] GeV
+
+one-event floor weights (mean MC weight, Sigma w / N_raw):
+  ZZ        0.001
+  DY        1.915
+  TTLL      0.036
+
+cut-based (H_Mass):
+  S =   28.374 +-  0.143
+  B =   14.873 +-  3.504 (stat)  +-  3.504 (floored)
+  Z_asimov =    5.964
+  Z_syst   =    4.013
+  Z1       =    7.357
+
+   WP         S         B    B_err    B_flr   Z_asimov    Z_syst        Z1
+----------------------------------------------------------------------------------
+ 0.50    28.315    14.852    3.504    3.504      5.957     4.007     7.347
+ 0.55    28.257    14.824    3.504    3.504      5.950     4.001     7.339
+ 0.60    28.159    14.769    3.504    3.504      5.941     3.990     7.327
+ 0.65    28.024    14.653    3.504    3.504      5.933     3.975     7.321
+ 0.70    27.558    11.895    2.516    2.516      6.284     4.651     7.990
+ 0.75    25.612    11.089    2.515    2.515      6.052     4.410     7.691
+ 0.80    21.088     6.746    0.103    1.917      6.060     4.374     8.119
+ 0.85    12.838     4.177    0.076    1.916      4.703     3.001     6.282
+ 0.90     7.030     1.919    0.053    1.915      3.674     1.780     5.075
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v3_new/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v3_new/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v3_new/VHToNonbb.root
+ 0.95     0.000     0.000    0.000    1.915        nan       nan       nan
+
+best WP = 0.70  (Z_syst = 4.651, B >= 0.5)
+  vs cut-based Z_syst = 4.013  ->  BDT improves over cut-based by +15.9% (honest, bkg-uncertainty folded in)
+
+wrote plots/wp_scan_model=bdt_v3_new.png
+
+###################################################################
+### model=bdt_v5_new
+###################################################################
+Info in <TCanvas::Print>: png file plots/wp_scan_model=bdt_v5_new.png has been created
+era=model=bdt_v5_new  window m4l in [120.0, 130.0] GeV
+
+one-event floor weights (mean MC weight, Sigma w / N_raw):
+  ZZ        0.001
+  DY        1.915
+  TTLL      0.036
+
+cut-based (H_Mass):
+  S =   28.374 +-  0.143
+  B =   14.873 +-  3.504 (stat)  +-  3.504 (floored)
+  Z_asimov =    5.964
+  Z_syst   =    4.013
+  Z1       =    7.357
+
+   WP         S         B    B_err    B_flr   Z_asimov    Z_syst        Z1
+----------------------------------------------------------------------------------
+ 0.50    27.770    11.983    3.503    3.503      6.309     3.937     8.022
+ 0.55    27.717    11.800    3.503    3.503      6.332     3.929     8.069
+ 0.60    27.604    11.522    3.503    3.503      6.361     3.912     8.132
+ 0.65    27.383    11.134    3.503    3.503      6.391     3.881     8.206
+ 0.70    27.026    10.685    3.503    3.503      6.408     3.833     8.268
+ 0.75    26.444     7.701    2.441    2.441      6.987     4.578     9.529
+ 0.80    25.605     4.568    0.118    1.918      7.919     4.909    11.980
+ 0.85    23.641     3.592    0.115    1.918      7.940     4.498    12.474
+ 0.90    18.417     1.890    0.097    1.917      7.721     3.325    13.398
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v5_new/VHToNonbb.root
+ 0.95     0.027     0.000    0.000    1.915        nan       nan       nan
+
+best WP = 0.80  (Z_syst = 4.909, B >= 0.5)
+  vs cut-based Z_syst = 4.013  ->  BDT improves over cut-based by +22.3% (honest, bkg-uncertainty folded in)
+
+wrote plots/wp_scan_model=bdt_v5_new.png
+
+###################################################################
+### model=bdt_v6_new
+###################################################################
+Info in <TCanvas::Print>: png file plots/wp_scan_model=bdt_v6_new.png has been created
+era=model=bdt_v6_new  window m4l in [120.0, 130.0] GeV
+
+one-event floor weights (mean MC weight, Sigma w / N_raw):
+  ZZ        0.001
+  DY        1.915
+  TTLL      0.036
+
+cut-based (H_Mass):
+  S =   28.374 +-  0.143
+  B =   14.873 +-  3.504 (stat)  +-  3.504 (floored)
+  Z_asimov =    5.964
+  Z_syst   =    4.013
+  Z1       =    7.357
+
+   WP         S         B    B_err    B_flr   Z_asimov    Z_syst        Z1
+----------------------------------------------------------------------------------
+ 0.50    27.698    14.309    3.504    3.504      5.923     3.940     7.322
+ 0.55    27.558    14.232    3.504    3.504      5.909     3.925     7.305
+ 0.60    27.398    14.134    3.504    3.504      5.894     3.907     7.288
+ 0.65    27.225    14.021    3.504    3.504      5.879     3.888     7.271
+ 0.70    27.042    13.865    3.503    3.503      5.868     3.868     7.262
+ 0.75    26.779    13.670    3.503    3.503      5.848     3.839     7.243
+ 0.80    26.436    13.469    3.503    3.503      5.815     3.800     7.203
+ 0.85    25.881    13.133    3.503    3.503      5.761     3.738     7.142
+ 0.90    24.859    12.451    3.502    3.502      5.672     3.621     7.045
+ 0.95    22.340     6.346    0.099    1.917      6.471     4.563     8.868
+
+best WP = 0.95  (Z_syst = 4.563, B >= 0.5)
+  vs cut-based Z_syst = 4.013  ->  BDT improves over cut-based by +13.7% (honest, bkg-uncertainty folded in)
+
+wrote plots/wp_scan_model=bdt_v6_new.png
+
+###################################################################
+### model=bdt_v7
+###################################################################
+Info in <TCanvas::Print>: png file plots/wp_scan_model=bdt_v7.png has been created
+era=model=bdt_v7  window m4l in [120.0, 130.0] GeV
+
+one-event floor weights (mean MC weight, Sigma w / N_raw):
+  ZZ        0.001
+  DY        1.915
+  TTLL      0.036
+
+cut-based (H_Mass):
+  S =   28.374 +-  0.143
+  B =   14.873 +-  3.504 (stat)  +-  3.504 (floored)
+  Z_asimov =    5.964
+  Z_syst   =    4.013
+  Z1       =    7.357
+
+   WP         S         B    B_err    B_flr   Z_asimov    Z_syst        Z1
+----------------------------------------------------------------------------------
+ 0.50    27.715    11.895    3.503    3.503      6.314     3.930     8.036
+ 0.55    27.439    11.532    3.503    3.503      6.327     3.895     8.080
+ 0.60    27.203    11.409    3.503    3.503      6.304     3.867     8.054
+ 0.65    27.098    11.280    3.503    3.503      6.308     3.854     8.069
+ 0.70    24.510     4.613    0.113    1.918      7.636     4.772    11.412
+ 0.75     8.672     1.009    0.041    1.915      5.142     1.739     8.633
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VHToNonbb.root
+ 0.80     0.000     0.000    0.000    1.915        nan       nan       nan
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VHToNonbb.root
+ 0.85     0.000     0.000    0.000    1.915        nan       nan       nan
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VHToNonbb.root
+ 0.90     0.000     0.000    0.000    1.915        nan       nan       nan
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VHToNonbb.root
+ 0.95     0.000     0.000    0.000    1.915        nan       nan       nan
+
+best WP = 0.70  (Z_syst = 4.772, B >= 0.5)
+  vs cut-based Z_syst = 4.013  ->  BDT improves over cut-based by +18.9% (honest, bkg-uncertainty folded in)
+
+wrote plots/wp_scan_model=bdt_v7.png
+
+###################################################################
+### model=bdt_v8
+###################################################################
+Info in <TCanvas::Print>: png file plots/wp_scan_model=bdt_v8.png has been created
+era=model=bdt_v8  window m4l in [120.0, 130.0] GeV
+
+one-event floor weights (mean MC weight, Sigma w / N_raw):
+  ZZ        0.001
+  DY        1.915
+  TTLL      0.036
+
+cut-based (H_Mass):
+  S =   28.374 +-  0.143
+  B =   14.873 +-  3.504 (stat)  +-  3.504 (floored)
+  Z_asimov =    5.964
+  Z_syst   =    4.013
+  Z1       =    7.357
+
+   WP         S         B    B_err    B_flr   Z_asimov    Z_syst        Z1
+----------------------------------------------------------------------------------
+ 0.50    25.821     8.088    2.515    2.515      6.750     4.436     9.080
+ 0.55    25.264     5.074    0.131    1.919      7.614     4.918    11.216
+ 0.60    24.363     4.414    0.123    1.918      7.693     4.728    11.597
+ 0.65    23.082     3.679    0.121    1.918      7.749     4.444    12.034
+ 0.70    20.839     2.858    0.118    1.918      7.653     3.970    12.326
+ 0.75    17.902     1.930    0.115    1.918      7.523     3.285    12.885
+ 0.80    11.662     0.890    0.099    1.917      6.566     1.990    12.363
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v8/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VHToNonbb.root
+ 0.85     0.000     0.000    0.000    1.915        nan       nan       nan
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v8/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VHToNonbb.root
+ 0.90     0.000     0.000    0.000    1.915        nan       nan       nan
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v8/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VHToNonbb.root
+ 0.95     0.000     0.000    0.000    1.915        nan       nan       nan
+
+best WP = 0.55  (Z_syst = 4.918, B >= 0.5)
+  vs cut-based Z_syst = 4.013  ->  BDT improves over cut-based by +22.5% (honest, bkg-uncertainty folded in)
+
+wrote plots/wp_scan_model=bdt_v8.png
+
+###################################################################
+### model=bdt_v9
+###################################################################
+Info in <TCanvas::Print>: png file plots/wp_scan_model=bdt_v9.png has been created
+era=model=bdt_v9  window m4l in [120.0, 130.0] GeV
+
+one-event floor weights (mean MC weight, Sigma w / N_raw):
+  ZZ        0.001
+  DY        1.915
+  TTLL      0.036
+
+cut-based (H_Mass):
+  S =   28.374 +-  0.143
+  B =   14.873 +-  3.504 (stat)  +-  3.504 (floored)
+  Z_asimov =    5.964
+  Z_syst   =    4.013
+  Z1       =    7.357
+
+   WP         S         B    B_err    B_flr   Z_asimov    Z_syst        Z1
+----------------------------------------------------------------------------------
+ 0.50    27.715    11.895    3.503    3.503      6.314     3.930     8.036
+ 0.55    27.439    11.532    3.503    3.503      6.327     3.895     8.080
+ 0.60    27.203    11.409    3.503    3.503      6.304     3.867     8.054
+ 0.65    27.098    11.280    3.503    3.503      6.308     3.854     8.069
+ 0.70    24.510     4.613    0.113    1.918      7.636     4.772    11.412
+ 0.75     8.672     1.009    0.041    1.915      5.142     1.739     8.633
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v9/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v9/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v9/VHToNonbb.root
+ 0.80     0.000     0.000    0.000    1.915        nan       nan       nan
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v9/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v9/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v9/VHToNonbb.root
+ 0.85     0.000     0.000    0.000    1.915        nan       nan       nan
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v9/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v9/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v9/VHToNonbb.root
+ 0.90     0.000     0.000    0.000    1.915        nan       nan       nan
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v9/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v9/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v9/VHToNonbb.root
+ 0.95     0.000     0.000    0.000    1.915        nan       nan       nan
+
+best WP = 0.70  (Z_syst = 4.772, B >= 0.5)
+  vs cut-based Z_syst = 4.013  ->  BDT improves over cut-based by +18.9% (honest, bkg-uncertainty folded in)
+
+wrote plots/wp_scan_model=bdt_v9.png
+
+###################################################################
+### model=bdt_v10
+###################################################################
+Info in <TCanvas::Print>: png file plots/wp_scan_model=bdt_v10.png has been created
+era=model=bdt_v10  window m4l in [120.0, 130.0] GeV
+
+one-event floor weights (mean MC weight, Sigma w / N_raw):
+  ZZ        0.001
+  DY        1.915
+  TTLL      0.036
+
+cut-based (H_Mass):
+  S =   28.374 +-  0.143
+  B =   14.873 +-  3.504 (stat)  +-  3.504 (floored)
+  Z_asimov =    5.964
+  Z_syst   =    4.013
+  Z1       =    7.357
+
+   WP         S         B    B_err    B_flr   Z_asimov    Z_syst        Z1
+----------------------------------------------------------------------------------
+ 0.50    27.903    10.943    3.503    3.503      6.528     3.932     8.435
+ 0.55    27.789    10.642    3.503    3.503      6.566     3.913     8.518
+ 0.60    27.645     7.883    2.515    2.515      7.190     4.656     9.846
+ 0.65    27.440     7.547    2.515    2.515      7.242     4.618     9.988
+ 0.70    27.189     7.216    2.515    2.515      7.287     4.572    10.122
+ 0.75    26.809     4.268    0.117    1.918      8.353     5.018    12.977
+ 0.80    26.276     3.751    0.115    1.918      8.507     4.854    13.567
+ 0.85    25.309     3.074    0.100    1.917      8.693     4.564    14.435
+ 0.90    23.476     2.358    0.097    1.917      8.760     4.094    15.287
+ 0.95    18.812     1.291    0.085    1.916      8.530     2.996    16.558
+
+best WP = 0.75  (Z_syst = 5.018, B >= 0.5)
+  vs cut-based Z_syst = 4.013  ->  BDT improves over cut-based by +25.0% (honest, bkg-uncertainty folded in)
+
+wrote plots/wp_scan_model=bdt_v10.png

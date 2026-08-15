@@ -1,0 +1,40 @@
+# Input ntuples for the neural fake factor (neuralff/), MC only.
+#
+# Same producer as samples.yaml — SKNanoAnalyzer `fake` with
+# --userflags MakeTree — but tag `nff`, whose fillTreeRow does NOT apply the
+# MET<25 / MT<25 cut. That matters: the official MC fake-rate maps in
+# /data6/Users/snuintern2/fake/fr/fakerate_muon_*.json are measured in the
+# Inclusive region (away jet only, no MET/MT cut), and were verified to equal
+# our Mu8/Mu17-stitched Inclusive histogram to 1.000 in all 21 bins. A parquet
+# built from the bdtflav2 tag sits 2-20% below them and cannot be compared to
+# them. MeasReg stays available offline through the ev_met / ev_mt columns.
+#
+# Skim this with --keep-all-flavors: the FR denominator is every gen-fake loose
+# muon, including the pileup and jet-unmatched ones the flavor study drops.
+#
+# Expect these to be much bigger than the bdtflav2 set. Measured from the
+# analyzer histograms, Inclusive/MeasReg loose yields are ~2.8-3.6x for QCD but
+# **23-29x for TTLJ**: ttbar has real MET and a real W, so MET<25 && MT<25 was
+# throwing away almost the entire sample. That is a bonus, not a problem — the
+# ttbar arm goes from ~21k rows/era, which is thin for a network, to ~500k.
+
+ntuple_root: /gv0/Users/snuintern2/SKNanoOutput/fake/MakeTree
+
+eras:
+  - "2016preVFP"
+  - "2016postVFP"
+  - "2017"
+  - "2018"
+
+tag: nff
+
+mc:
+  QCD_MuEnriched:
+    glob: "QCD_Pt-*_MuEnriched.root"
+  TTLJ:
+    glob: "TTLJ_powheg.root"
+
+# No data arm in this study: MC has gen truth, so the paper's two subtraction
+# classifiers have nothing to subtract. Left empty rather than deleted so
+# `skim.py --data` fails loudly instead of silently doing nothing.
+data: {}

@@ -199,6 +199,61 @@ assert len(FEATURES_SLIM) == 32, (
 assert not set(FEATURES_SLIM) - set(FEATURES_NOML), \
     "FEATURES_SLIM must stay a subset of FEATURES_NOML (no ML outputs)"
 
+# `slim` without the two variables the flat FR map is binned in, by name. The
+# question it is meant to ask: what separation survives when the model cannot
+# see WHERE IN THE MAP the muon sits?
+#
+# MEASURED on the true-b slice, 2026-08-12, and it matters for how the result
+# reads: this set removes the two NAMES, not the information. Still present are
+#   jet_abseta   |r| = 0.996  against mu_abseta   (the muon is inside the jet)
+#   mu_pt        |r| = 0.988  against mu_conept   (Spearman 0.969)
+#   mu_ptErr     |r| = 0.724  against mu_conept   (track error scales with pT)
+#   sv_pt        |r| = 0.673  against mu_conept
+# so a model given `slim_nokin` can reconstruct both variables almost exactly.
+# If this arm lands on top of plain `slim`, the correct reading is "the proxies
+# carry it", NOT "the kinematics do not matter" — check whether mu_pt and
+# jet_abseta rose to the top of the gain ranking, which is the signature.
+# Dropping those two as well (28 features) is the variant that closes the leak;
+# it was offered and deliberately not taken (2026-08-12).
+FR_MAP_VARS = ["mu_conept", "mu_abseta"]
+FEATURES_SLIM_NOKIN = [f for f in FEATURES_SLIM if f not in FR_MAP_VARS]
+assert len(FEATURES_SLIM_NOKIN) == 30, (
+    f"FEATURES_SLIM_NOKIN has {len(FEATURES_SLIM_NOKIN)}, expected 30")
+
+# The next rung: every MUON-level pT and eta column gone, `mu_pt` included.
+# `slim_nokin` above was defeated exactly as its comment predicted — mu_pt
+# walked straight into mu_conept's rank-1 gain slot and the AUC did not move
+# (b 0.7590 vs 0.7587, c 0.6713 vs 0.6725, measured 2026-08-12) — so this set
+# takes mu_pt out too.
+#
+# NOT a "no kinematics" set, and must never be labelled one. `jet_abseta` is
+# still here at |r| = 0.996 against mu_abseta (the muon is inside the jet), so
+# |eta| is untouched; `mu_ptErr` (0.724) and `sv_pt` (0.673) still track
+# conePt. What this removes is the muon's own pT and eta columns, which is why
+# it is called `nomukin` and not `nokin`.
+MU_KIN_VARS = ["mu_conept", "mu_pt", "mu_abseta"]
+FEATURES_SLIM_NOMUKIN = [f for f in FEATURES_SLIM if f not in MU_KIN_VARS]
+assert len(FEATURES_SLIM_NOMUKIN) == 29, (
+    f"FEATURES_SLIM_NOMUKIN has {len(FEATURES_SLIM_NOMUKIN)}, expected 29")
+
+# Rung 4 of the same peel: mu_ptErr goes too, since it took rank 1 by gain in
+# the 29-feature model (412 on b). Peel order, by measured |r| against
+# mu_conept on the true-b slice, so the next rung is a one-line edit:
+#   mu_pt .988 | mu_ptErr .724 | sv_pt .673 | mu_jetNDauCharged .481 |
+#   jet_nconst .387        ... and jet_abseta .996 against mu_abseta.
+#
+# PEELING ONE AT A TIME DOES NOT WORK, and that is measured, not assumed. An
+# XGBoost regressor fitted on whatever remains reconstructs mu_conept at
+# R2 = 0.974 / 0.971 / 0.964 / 0.959 / 0.961 for the 32 / 30 / 29 / 28 / 27
+# feature sets: conePt is distributed across the whole set, not carried by any
+# one column, so no amount of removing its proxies individually will blind the
+# model to it. |eta| is the opposite -- jet_abseta is its SOLE carrier and
+# dropping that one column takes R2 from 0.996 to 0.511. See RESULTS.md 15.1.
+KIN_PEEL_28 = ["mu_conept", "mu_abseta", "mu_pt", "mu_ptErr"]
+FEATURES_SLIM_NOMUKIN28 = [f for f in FEATURES_SLIM if f not in KIN_PEEL_28]
+assert len(FEATURES_SLIM_NOMUKIN28) == 28, (
+    f"FEATURES_SLIM_NOMUKIN28 has {len(FEATURES_SLIM_NOMUKIN28)}, expected 28")
+
 # Variables that define the tight WP (the FR numerator) or track it closely.
 # The tight WP is |SIP3D| < 3 and miniPFRelIso < 0.1 on top of POG medium ID,
 # so every isolation and IP-significance variable is partly the numerator
@@ -318,6 +373,9 @@ FEATURE_SETS = {
     "notag": FEATURES_NOTAG,
     "noml": FEATURES_NOML,
     "slim": FEATURES_SLIM,
+    "slim_nokin": FEATURES_SLIM_NOKIN,
+    "slim_nomukin": FEATURES_SLIM_NOMUKIN,
+    "slim_nomukin28": FEATURES_SLIM_NOMUKIN28,
     "nowp": FEATURES_NOWP,
     "direct": FEATURES_DIRECT,
     "direct_map": FEATURES_DIRECT_MAP,

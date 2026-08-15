@@ -107,6 +107,30 @@ ORIGIN_CODE = {"QCD_MuEnriched": 0, "TTLJ": 1}
 FLAVOR_SLICE = {v: k for k, v in CLASSES.items()}
 
 
+def parse_cell(spec: str) -> tuple[float, float, float, float]:
+    """'ptlo,pthi,etalo,etahi' -> four floats, with the errors up front."""
+    try:
+        lo_pt, hi_pt, lo_eta, hi_eta = (float(v) for v in spec.split(","))
+    except ValueError:
+        raise ValueError("--cell must be 'ptlo,pthi,etalo,etahi' (four "
+                         f"numbers), got {spec!r}") from None
+    if hi_pt <= lo_pt or hi_eta <= lo_eta:
+        raise ValueError(f"--cell {spec!r} has an empty interval")
+    return lo_pt, hi_pt, lo_eta, hi_eta
+
+
+def cell_mask(conept: np.ndarray, abseta: np.ndarray, spec: str) -> np.ndarray:
+    """Rows inside one (conePt, |eta|) FR cell, half-open [lo, hi) on both axes.
+
+    Shared with evaluate.py so the two cannot drift: evaluate has to replay the
+    *identical* mask before applying the saved test indices, and a boundary
+    convention that disagreed by one row would silently misalign them.
+    """
+    lo_pt, hi_pt, lo_eta, hi_eta = parse_cell(spec)
+    return ((conept >= lo_pt) & (conept < hi_pt)
+            & (abseta >= lo_eta) & (abseta < hi_eta))
+
+
 def detect_gpu() -> bool:
     """Return True only if xgboost can really train on a GPU.
 
@@ -287,6 +311,13 @@ def main() -> None:
                         "training. Meant for --target origin, where the "
                         "question is posed at FIXED true flavor; it is a no-op "
                         "sanity knob for the other targets.")
+    p.add_argument("--cell", default=None, metavar="PTLO,PTHI,ETALO,ETAHI",
+                   help="keep only rows inside one (conePt, |eta|) FR cell "
+                        "before training, e.g. '10,20,0.0,0.9'. Half-open "
+                        "[lo,hi) on both axes — the same convention as "
+                        "evaluate.py::cell_auc, so a model trained with --cell "
+                        "and evaluated with matching config bins reports its "
+                        "own single row.")
     args = p.parse_args()
 
     cfg = load_yaml(args.config)
@@ -334,6 +365,21 @@ def main() -> None:
                  args.flavor, int(keep.sum()), len(y))
         if keep.sum() == 0:
             raise ValueError(f"no rows with flavor == {args.flavor}")
+        X, y, w_phys = X[keep], y[keep], w_phys[keep]
+        meta = {k: v[keep] for k, v in meta.items()}
+
+    if args.cell:
+        # Same reasoning as --flavor, one level finer. The point of training
+        # inside a cell is that the model cannot borrow separation from the
+        # cell boundary, so the filter has to come before build_weights and
+        # before the split: the class balance and the 0.999 weight clip are
+        # then computed within the cell, which is what makes the per-cell AUCs
+        # comparable to each other and to the inclusive number.
+        keep = cell_mask(meta["mu_conept"], meta["mu_abseta"], args.cell)
+        log.info("cell '%s': keeping %d/%d rows",
+                 args.cell, int(keep.sum()), len(y))
+        if keep.sum() == 0:
+            raise ValueError(f"no rows inside cell {args.cell}")
         X, y, w_phys = X[keep], y[keep], w_phys[keep]
         meta = {k: v[keep] for k, v in meta.items()}
 
@@ -457,6 +503,7 @@ def main() -> None:
     out.with_suffix(".meta.json").write_text(json.dumps({
         "target": args.target,
         "flavor_slice": args.flavor,
+        "cell": args.cell,
         "ntuples": str(args.ntuples),
         "feature_set": fs_name,
         "features": list(features),

@@ -1,0 +1,205 @@
+cut
+v1 raw train
+v2 removed mass related
+v3 planing
+v5 signal region [105, 140]
+v6 both
+v7 SR [110, 140]
+v8 SR [120, 130]
+v9 SR [110, 140]
+v10 SR [110, 145]
+
+cut
+
+   WP         S         B    S_err    B_err   Z_asimov         Z1
+----------------------------------------------------------------------
+    x       28.374    14.873    0.143    3.504      5.964      7.357
+
+
+
+
+
+
+  v1
+   WP         S         B    S_err    B_err   Z_asimov         Z1
+----------------------------------------------------------------------
+ 0.50    28.354    14.229    0.143    3.504      6.054      7.517
+ 0.55    28.349    14.131    0.143    3.504      6.068      7.541
+ 0.60    28.338    14.028    0.143    3.504      6.081      7.566
+ 0.65    28.326    13.874    0.143    3.503      6.102      7.605
+ 0.70    28.311    13.676    0.143    3.503      6.130      7.655
+ 0.75    28.286    13.461    0.143    3.503      6.159      7.709
+ 0.80    28.251    13.212    0.143    3.503      6.192      7.772
+ 0.85    28.202    12.871    0.143    3.503      6.238      7.861
+ 0.90    28.078    12.321    0.142    3.503      6.308      7.999
+ 0.95    27.678    11.303    0.141    3.503      6.416      8.233
+
+
+
+
+
+
+
+v2
+   WP         S         B    S_err    B_err   Z_asimov         Z1
+----------------------------------------------------------------------
+ 0.50    27.192     8.641    0.140    0.128      6.896      9.250
+ 0.55    26.910     8.387    0.139    0.118      6.902      9.292
+ 0.60    26.509     8.164    0.138    0.118      6.876      9.278
+ 0.65    26.018     7.868    0.137    0.111      6.850      9.275
+ 0.70    25.362     7.495    0.135    0.104      6.811      9.264
+ 0.75    24.495     7.107    0.133    0.103      6.732      9.188
+ 0.80    23.288     6.599    0.130    0.096      6.612      9.066
+ 0.85    21.420     5.856    0.125    0.093      6.410      8.852
+ 0.90    18.084     4.611    0.115    0.078      6.014      8.422
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v2_new/DY.root
+ 0.95    11.162     2.382    0.090    0.056      4.975      7.232
+
+
+
+v3
+   WP         S         B    S_err    B_err   Z_asimov         Z1
+----------------------------------------------------------------------
+ 0.50    28.315    14.852    0.143    3.504      5.957      7.347
+ 0.55    28.257    14.824    0.143    3.504      5.950      7.339
+ 0.60    28.159    14.769    0.142    3.504      5.941      7.327
+ 0.65    28.024    14.653    0.142    3.504      5.933      7.321
+ 0.70    27.558    11.895    0.141    2.516      6.284      7.990
+ 0.75    25.612    11.089    0.136    2.515      6.052      7.691
+ 0.80    21.088     6.746    0.124    0.103      6.060      8.119
+ 0.85    12.838     4.177    0.096    0.076      4.703      6.282
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v3_new/DY.root
+ 0.90     7.030     1.919    0.072    0.053      3.674      5.075
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v3_new/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v3_new/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v3_new/VHToNonbb.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v3_new/ZZTo4L_powheg.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v3_new/DY.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v3_new/TTLL_powheg.root
+ 0.95     0.000     0.000    0.000    0.000        nan        nan
+
+
+v5
+   WP         S         B    S_err    B_err   Z_asimov         Z1
+----------------------------------------------------------------------
+ 0.50    27.770    11.983    0.141    3.503      6.309      8.022
+ 0.55    27.717    11.800    0.141    3.503      6.332      8.069
+ 0.60    27.604    11.522    0.141    3.503      6.361      8.132
+ 0.65    27.383    11.134    0.140    3.503      6.391      8.206
+ 0.70    27.026    10.685    0.140    3.503      6.408      8.268
+ 0.75    26.444     7.701    0.138    2.441      6.987      9.529
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v5_new/DY.root
+ 0.80    25.605     4.568    0.136    0.118      7.919     11.980
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v5_new/DY.root
+ 0.85    23.641     3.592    0.130    0.115      7.940     12.474
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v5_new/DY.root
+ 0.90    18.417     1.890    0.115    0.097      7.721     13.398
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v5_new/VHToNonbb.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v5_new/ZZTo4L_powheg.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v5_new/DY.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v5_new/TTLL_powheg.root
+ 0.95     0.027     0.000    0.004    0.000        nan        nan
+
+
+v6
+   WP         S         B    S_err    B_err   Z_asimov         Z1
+----------------------------------------------------------------------
+ 0.50    27.698    14.309    0.141    3.504      5.923      7.322
+ 0.55    27.558    14.232    0.141    3.504      5.909      7.305
+ 0.60    27.398    14.134    0.141    3.504      5.894      7.288
+ 0.65    27.225    14.021    0.140    3.504      5.879      7.271
+ 0.70    27.042    13.865    0.140    3.503      5.868      7.262
+ 0.75    26.779    13.670    0.139    3.503      5.848      7.243
+ 0.80    26.436    13.469    0.138    3.503      5.815      7.203
+ 0.85    25.881    13.133    0.137    3.503      5.761      7.142
+ 0.90    24.859    12.451    0.134    3.502      5.672      7.045
+ 0.95    22.340     6.346    0.127    0.099      6.471      8.868
+
+v7
+ WP         S         B    S_err    B_err   Z_asimov         Z1
+----------------------------------------------------------------------
+ 0.50    27.715    11.895    0.141    3.503      6.314      8.036
+ 0.55    27.439    11.532    0.141    3.503      6.327      8.080
+ 0.60    27.203    11.409    0.140    3.503      6.304      8.054
+ 0.65    27.098    11.280    0.140    3.503      6.308      8.069
+  WARN missing Central/H_Mass_BDT070 in /data6/Users/snuintern2/Higgs/model=bdt_v7/DY.root
+ 0.70    24.510     4.613    0.133    0.113      7.636     11.412
+  WARN missing Central/H_Mass_BDT075 in /data6/Users/snuintern2/Higgs/model=bdt_v7/DY.root
+ 0.75     8.672     1.009    0.079    0.041      5.142      8.633
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VHToNonbb.root
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ZZTo4L_powheg.root
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v7/DY.root
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v7/TTLL_powheg.root
+ 0.80     0.000     0.000    0.000    0.000        nan        nan
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VHToNonbb.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ZZTo4L_powheg.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v7/DY.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v7/TTLL_powheg.root
+ 0.85     0.000     0.000    0.000    0.000        nan        nan
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VHToNonbb.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ZZTo4L_powheg.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v7/DY.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v7/TTLL_powheg.root
+ 0.90     0.000     0.000    0.000    0.000        nan        nan
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v7/VHToNonbb.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v7/ZZTo4L_powheg.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v7/DY.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v7/TTLL_powheg.root
+ 0.95     0.000     0.000    0.000    0.000        nan        nan
+
+v8
+   WP         S         B    S_err    B_err   Z_asimov         Z1
+----------------------------------------------------------------------
+ 0.50    25.821     8.088    0.136    2.515      6.750      9.080
+ 0.55    25.264     5.074    0.135    0.131      7.614     11.216
+ 0.60    24.363     4.414    0.132    0.123      7.693     11.597
+ 0.65    23.082     3.679    0.129    0.121      7.749     12.034
+ 0.70    20.839     2.858    0.122    0.118      7.653     12.326
+ 0.75    17.902     1.930    0.113    0.115      7.523     12.885
+  WARN missing Central/H_Mass_BDT080 in /data6/Users/snuintern2/Higgs/model=bdt_v8/DY.root
+ 0.80    11.662     0.890    0.091    0.099      6.566     12.363
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v8/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VHToNonbb.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v8/ZZTo4L_powheg.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v8/DY.root
+  WARN missing Central/H_Mass_BDT085 in /data6/Users/snuintern2/Higgs/model=bdt_v8/TTLL_powheg.root
+ 0.85     0.000     0.000    0.000    0.000        nan        nan
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v8/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VHToNonbb.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v8/ZZTo4L_powheg.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v8/DY.root
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v8/TTLL_powheg.root
+ 0.90     0.000     0.000    0.000    0.000        nan        nan
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v8/ggHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VBFHToZZTo4L.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v8/VHToNonbb.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v8/ZZTo4L_powheg.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v8/DY.root
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v8/TTLL_powheg.root
+ 0.95     0.000     0.000    0.000    0.000        nan        nan
+
+v10
+   WP         S         B    S_err    B_err   Z_asimov         Z1
+----------------------------------------------------------------------
+ 0.50    27.903    10.943    0.142    3.503      6.528      8.435
+ 0.55    27.789    10.642    0.141    3.503      6.566      8.518
+ 0.60    27.645     7.883    0.141    2.515      7.190      9.846
+ 0.65    27.440     7.547    0.141    2.515      7.242      9.988
+ 0.70    27.189     7.216    0.140    2.515      7.287     10.122
+ 0.75    26.809     4.268    0.139    0.117      8.353     12.977
+ 0.80    26.276     3.751    0.137    0.115      8.507     13.567
+ 0.85    25.309     3.074    0.135    0.100      8.693     14.435
+  WARN missing Central/H_Mass_BDT090 in /data6/Users/snuintern2/Higgs/model=bdt_v10/DY.root
+ 0.90    23.476     2.358    0.130    0.097      8.760     15.287
+  WARN missing Central/H_Mass_BDT095 in /data6/Users/snuintern2/Higgs/model=bdt_v10/DY.root
+ 0.95    18.812     1.291    0.116    0.085      8.530     16.558
