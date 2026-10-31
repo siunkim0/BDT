@@ -1,0 +1,728 @@
+# Run 3 ID-case study, case 1 (2026-10-30) -- plots/idcase/run3_*.
+#
+#   loose = POG Medium + |dZ| < 0.1 + TkRelIso < 0.4 + miniIso < 0.4   (NO SIP3D)
+#   tight = the same + miniIso < 0.1                                    (NO SIP3D)
+#
+# Trees: fake --userflags MakeTree,LooseNoSIP --tag nff3ns (SKNanoAnalyzer fake.sh, block
+# r3id); parquet fakeflavor/data/ntuples_nff3ns/ (fakeflavor/config/samples_nff3ns.yaml).
+# The loose WP is IN THE TREES, so there is no `select:` here. Models
+# data/models/nff_qcd3ns_{sv3,sv3m}.pt.
+#
+# = nff.yaml with exactly these differences (asserted when this file was written):
+#   binning.pt_col: axis_c2d + overflow: clip  -- the measured conePt x |eta| map of
+#                                                plots/idcase (cfg_*_axis_c2d.yaml)
+#   compare.official_json: null                -- no published map at this WP, so
+#                                                `flat` is measured from --source-ntuples
+#   label: mu_miniiso < 0.1   -- tight redefined from the parquet's own columns
+# conePt keeps the tree definition pt * (1 + max(0, miniIso - 0.1)) in every case.
+
+# Neural fake factor — arXiv:2511.06972, MC-only configuration.
+#
+# Only the paper's *ratio* classifier is configured here. The two subtraction
+# classifiers of their Fig. 3 exist to remove real-lepton contamination from
+# data; we train on MC and select gen-fakes with `isPrompt == False` in the
+# skim, so there is nothing to subtract.
+
+# Two arms of the paper's five observables, differing only in which pT.
+#
+# The rule that governs the choice: **no input may be a function of
+# miniPFRelIso or of SIP3D**, because those two define the tight WP. Since
+# conePt = pt x (1 + max(0, miniiso - 0.1)), the PAIR (mu_pt, mu_conept)
+# determines miniiso exactly — measured here, P(tight | conePt > pt) = 0.000000
+# — so the two must never appear together. Either one ALONE is admissible: with
+# no second pT to divide by, miniiso is not recoverable.
+#
+#  paper5   conePt. The variable the reference map is binned in, which is also
+#           what the paper does (their binned map and their network both use the
+#           electron pT). This is the arm to read for a conePt x |eta|
+#           comparison: a model that has never seen conePt cannot resolve the
+#           axis it is being plotted against. xgboost reference AUC 0.695, and
+#           the fail-side f stays intermediate (mean 0.20, p99 0.62, nothing
+#           above 0.95), so it is safe for the matrix method too.
+#  paper5_rawpt
+#           raw mu_pt, carrying no WP information at all. xgboost reference AUC
+#           0.577 — the difference between the two arms measures how much of the
+#           map's conePt dependence IS the working point. Read it as the control.
+default_set: paper5
+feature_sets:
+  paper5:
+    numerical: [mu_conept, mu_abseta, ev_met, ev_mt]
+    # Label-encoded and embedded. `era` is not a paper feature — it is how the
+    # four eras share one model (the paper's categorical-feature path).
+    categorical: [ev_njet40, era]
+  paper5_rawpt:
+    numerical: [mu_pt, mu_abseta, ev_met, ev_mt]
+    categorical: [ev_njet40, era]
+
+  # ---- jet-local arms -----------------------------------------------------
+  #
+  # Motivation, measured: `paper5` transfers QCD -> ttbar WORSE than the binned
+  # map (rate 1.179 vs 1.077, matrix 1.298 vs 1.107). Permutation importance
+  # ranks its inputs M_T (+1.885) > conePt (+0.302) > MET (+0.258), i.e. the most
+  # load-bearing input is the most process-dependent one. In QCD a large MET IS a
+  # mismeasured jet, so f rises with it; in ttbar MET is the W neutrino, so it
+  # does not. The network learns QCD's correlation and carries it across.
+  #
+  # So drop ev_met and ev_mt and replace them with variables of the JET that
+  # produced the fake rather than of the EVENT that produced the jet. Which ones
+  # comes from the flavour-BDT gain rankings, not from a guess:
+  #   sv_masssum   rank 1 by 3.5x in QCD      (plots/flavor_v3/flavor_bdt_qcd_v3.pdf p.9)
+  #   sv_dr_jet    rank 1 in ttbar            (plots/flavor_v3/flavor_bdt_ttlj_v3.pdf p.9)
+  #   sv_pangle    rank 4 in QCD, rank 9 in ttbar
+  #   jet_nconst   rank 1 once the muon kinematics are peeled away
+  #                                           (plots/origin_cells/...pdf p.16)
+  #
+  # Two bases, because ev_njet40 is the OTHER process-dependent input (N_jet = 1
+  # is 88.8% of QCD but 30.2% of ttbar) and its contribution should be measured
+  # rather than assumed. Arms without the `j` suffix have no event-level input at
+  # all; the `j` twins add ev_njet40 back.
+  #
+  # sv0 / sv0j are the CONTROLS and the pipeline gate: with only the map's own
+  # two axes they carry exactly the binned map's information, so they must
+  # reproduce fr/*.json and transfer at ~ the flat map's numbers. Without them,
+  # `sv1` vs `paper5` would mix "dropped MET/M_T" with "added sv_masssum" and
+  # neither effect would be attributable.
+  #
+  # jet_nconst is NUMERICAL, not categorical: skim.py casts every jet_*/sv_*
+  # column to float32, and fit_encoding's categorical branch forces numeric
+  # columns onto levels 0..njet_max, which would clip 144 constituents into 6.
+  #
+  # sv_* and jet_nconst carry NaN where the quantity does not exist (no matched
+  # source jet: 2.31% QCD / 1.07% ttbar; no SV in the jet cone: 64.1% / 55.8%).
+  # data.py imputes to the training mean and appends a `<feat>__isnan` indicator
+  # per affected feature — "does this jet have a reconstructed secondary vertex"
+  # is the heavy-flavour handle itself, not a nuisance.
+  sv0:
+    numerical: [mu_conept, mu_abseta]
+    categorical: [era]
+  sv1:
+    numerical: [mu_conept, mu_abseta, sv_masssum]
+    categorical: [era]
+  sv2:
+    numerical: [mu_conept, mu_abseta, sv_masssum, sv_dr_jet, sv_pangle]
+    categorical: [era]
+  sv3:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst]
+    categorical: [era]
+  # sv3 minus sv_masssum: jet_nconst alone on top of the map's axes. Added
+  # 2026-09-25 to split sv3's two inputs in the SIP-only / iso-only label study
+  # (nff_sipwp.yaml / nff_isowp.yaml): which one carries the SIP3D (lifetime)
+  # information, and which one disturbs the isolation part.
+  n1:
+    numerical: [mu_conept, mu_abseta, jet_nconst]
+    categorical: [era]
+  # Leak demonstrations at the ANALYSIS WP (2026-10-02). mu_pt and jet_pt
+  # together give the muon's share of its jet (ptRatio), an isolation proxy,
+  # and neither set carries conePt, so the network can rebuild isolation from
+  # the pair. mj6 = nff_jet.yaml's m1 minus mu_dxy (an IP proxy at this WP);
+  # mj2 = the pair alone. Trained to SHOW the failure, never as candidates.
+  mj6:
+    numerical: [mu_pt, jet_pt, mu_abseta, sv_masssum, jet_nconst, mu_jetPtRelv2]
+    categorical: [era]
+  mj2:
+    numerical: [mu_pt, jet_pt]
+    categorical: [era]
+  sv4:
+    numerical: [mu_conept, mu_abseta, sv_masssum, sv_dr_jet, sv_pangle, jet_nconst]
+    categorical: [era]
+
+  # sv5 closes a 2x2 factorial that sv0 / sv1 / sv3 left with one corner empty:
+  #
+  #                   no jet_nconst   + jet_nconst
+  #   no sv_masssum       sv0             sv5
+  #   +  sv_masssum       sv1             sv3
+  #
+  # sv3 is the best arm in the study, and without sv5 there is no way to say
+  # whether jet_nconst does the work, sv_masssum does, or only the pair does.
+  # Note sv5 carries NO sv_* feature at all despite the name — the numbering
+  # follows the block it was added to, not its contents.
+  sv5:
+    numerical: [mu_conept, mu_abseta, jet_nconst]
+    categorical: [era]
+
+  # sv6 fills the one cell of the jet-local scan that was left empty. sv_dr_jet
+  # and sv_pangle enter TOGETHER in sv2 and in sv4 and nowhere else, so nothing
+  # in the scan attributes sv4's loss against sv3 (1.025 vs 1.013 per event) to
+  # one of them rather than the other. sv6 = sv3 + sv_dr_jet = sv4 - sv_pangle
+  # separates the two: land on sv3 and the pointing angle is what costs sv4,
+  # land on sv4 and the dR is.
+  sv6:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, sv_dr_jet]
+    categorical: [era]
+
+  # sv7 = sv1 + sv_dr_jet = sv6 - jet_nconst, which closes a SECOND 2x2, this
+  # one in {sv_dr_jet} x {jet_nconst} with sv_masssum held fixed in all four
+  # corners:
+  #
+  #                   no jet_nconst   + jet_nconst
+  #   no sv_dr_jet        sv1             sv3
+  #   +  sv_dr_jet        sv7             sv6
+  #
+  # sv6 showed sv_dr_jet is free once jet_nconst is present (+0.0025 AUC, no
+  # movement in the closure). sv7 asks the other half: can the SV geometry do
+  # jet_nconst's work, or only ride along beside it? Nothing already trained can
+  # say — sv_dr_jet appears with sv_pangle in sv2/sv4 and with jet_nconst in sv6.
+  sv7:
+    numerical: [mu_conept, mu_abseta, sv_masssum, sv_dr_jet]
+    categorical: [era]
+
+  # sv8 asks whether |eta| is earning its place. Every arm so far carries
+  # mu_conept + mu_abseta as its base, inherited from the binned map's two axes
+  # and never questioned. sv8 = sv3 - mu_abseta. If it matches sv3 then |eta| is
+  # carrying nothing once the jet is described, and the deployed map's second
+  # axis is redundant with the jet-local block. The FR scan already hints that
+  # way: |eta| has one of the flattest transfer ratios in the study (spread
+  # 1.02) but one of the smallest information contents (RMS(f)/f = 9.5%) — it
+  # transfers perfectly and says almost nothing.
+  sv8:
+    numerical: [mu_conept, sv_masssum, jet_nconst]
+    categorical: [era]
+
+  # sv9 asks the opposite: does throwing everything in make it worse? It is the
+  # flavour BDT's canonical FEATURES_SLIM (fakeflavor/features.py, the 32 of
+  # FR_1.pdf p.7) minus the three inputs that would hand the network the label.
+  #
+  # The exclusions are MEASURED, not argued:
+  #   isTight IS (|sip3d| < 3 AND miniiso < 0.1) — zero mismatches in 13,572,470
+  #     rows — so mu_sip3d and mu_miniiso are each literally half the label.
+  #   (mu_pt, mu_conept) recovers miniiso to 1.6e-7 on the 70.7% of rows with
+  #     conePt > pt, so only one of the pair may appear. conePt stays; it is the
+  #     map's axis and what every other arm uses.
+  #
+  # Two NEAR leaks stay in, flagged rather than removed — they are genuine
+  # flavour variables and dropping them would quietly change the question:
+  #   mu_ip3d         corr 0.620 with |sip3d|
+  #   mu_miniiso_neu  corr 0.720 with miniiso
+  # Everything else here is below 0.37 against both. If sv9 underperforms, the
+  # suspects in order are ev_met/ev_mt (the two inputs section 4c already
+  # identified as what breaks paper5, and the two LOWEST-information variables
+  # in the whole scan at 1.9% and 4.5%) and then those two near leaks — NOT the
+  # number of features. Read test_auc, n_clamp and top1pct together before
+  # concluding anything.
+  sv9:
+    numerical: [mu_conept, mu_abseta, mu_dxy, mu_ip3d, mu_miniiso_neu,
+                mu_pfiso04, mu_ptErr, mu_segmentComp, mu_nStations,
+                mu_highPurity, mu_jetPtRelv2, mu_jetRelIso, mu_jetNDauCharged,
+                jet_abseta, jet_dr_mu, jet_muEF, jet_nconst, jet_nmuons,
+                ev_met, ev_mt,
+                sv_masssum, sv_mass, sv_pt, sv_ptratio, sv_dlensig,
+                sv_dxysig, sv_pangle, sv_ntracks, sv_dr_jet]
+    categorical: [era]
+
+  # sv10 = sv3 + jet_dr_mu + sv_ptratio, chosen off the FR scan rather than
+  # guessed. Each candidate was scored on two measured numbers:
+  #
+  #   information    population-weighted RMS of f(x) about the inclusive f,
+  #                  divided by it. How much the variable actually moves the
+  #                  fake rate FOR EVENTS THAT EXIST — which is why mu_nStations
+  #                  does not qualify despite an apparent 48x range in f: the
+  #                  extreme bin holds 0.000% of the weight and across the
+  #                  populated values f only runs 0.250 -> 0.289.
+  #   transfer spread  max/min of f(ttbar)/f(QCD) on the cell-matched ttbar.
+  #
+  # jet_dr_mu (30.0%, 1.07) and sv_ptratio (23.0%, 1.07) are the two
+  # highest-information variables not already in an arm that carry no WP
+  # information and transfer BETTER than sv3's own two (1.12 each). Both hold
+  # up Run 2 -> Run 3 (1.07 -> 1.09) and across all eight eras.
+  #
+  # Rejected above them, each for a measured reason: mu_miniiso_neu / mu_pfiso04
+  # / mu_jetRelIso / jet_muEF / mu_ip3d / mu_dxy are WP proxies (|dxy| is corr
+  # 0.54 with |sip3d| even though SIGNED dxy reads 0.00 — the same sign trap as
+  # dxysig/dzsig); mu_jetNDauCharged transfers at 1.35 and 2.11 in Run 3;
+  # jet_abseta is 1.08 in Run 2 but 1.50 in Run 3; sv_pangle was measured to
+  # hurt (sv4) and sv_dr_jet to add nothing (sv6 == sv3, sv7 == sv1).
+  #
+  # The four jet-local inputs then read as one handle each, rather than four
+  # views of the same thing:
+  #   sv_masssum  what flavour the vertex is (B ~5 GeV vs C ~2 GeV)
+  #   jet_nconst  quark vs gluon, and how hard the fragmentation was
+  #   jet_dr_mu   how deep inside the jet the muon sits
+  #   sv_ptratio  how much of the jet's momentum the vertex carries
+  #
+  # Kept a strict SUPERSET of sv3, so sv10 - sv3 is exactly the two new features
+  # and the comparison has no second moving part.
+  sv10:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_dr_mu, sv_ptratio]
+    categorical: [era]
+
+  # sv3m = sv3 + the two jet multiplicities NanoAOD only started writing in
+  # Run 3. **RUN 3 ONLY — this arm cannot be trained on the Run 2 parquet.**
+  # Run 2 NanoAODv9 has no Jet_chMultiplicity / Jet_neMultiplicity branch at
+  # all (checked against the files, not the docs), so fake.cc writes the
+  # sentinel there and every Run 2 row would be NaN — an `__isnan` indicator
+  # perfectly aliased with the era embedding, which is a degenerate input, not
+  # a missing-value handle.
+  #
+  # Why these two and not something else: jet_nconst is the feature that
+  # carried sv3's accuracy in the 2x2 (RESULTS §4c), and ch/ne multiplicity is
+  # literally that count split by charge — the same handle at higher
+  # resolution. Their sum should be ~jet_nconst, so sv3m adds one genuinely new
+  # degree of freedom (the charged fraction), not two.
+  #
+  # Read it against `sv3` trained on the SAME Run 3 rows. Anything else
+  # confounds "Run 3" with "two more features".
+  sv3m:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult]
+    categorical: [era]
+
+  # ---- closing the Run 3 residual: more jet STRUCTURE, not more flavour ------
+  #
+  # sv3m leaves +9.3% on the Run 3 QCD->ttbar transfer. Three explanations were
+  # measured and killed before these arms were written (RESULTS §4h):
+  #
+  #  * it is not a jet-matching defect. dR(muon, matched jet) has median 0.031
+  #    and 0.001% above 0.4 in BOTH runs; GetAllJets() applies no cut; and only
+  #    0.92% of the Run 3 jet-less muons have any jet within dR < 0.4 (median dR
+  #    to the nearest jet: 2.68). The jets do not exist — v13 uses PUPPI, and
+  #    the Run 3 loose WP is tighter in isolation.
+  #  * it is not a b/c resolution problem. 93% of the c excess sits in c-jets
+  #    with NO reconstructed vertex, where every sv_* input is NaN, so an
+  #    sv_ntracks / sv_dlensig arm has a ceiling of 0.22 of the 9.3 points.
+  #  * it is not a flavour problem at all. An FR measured on QCD in
+  #    (conePt x |eta| x TRUTH flavour) cells and applied to ttbar gives 1.2098;
+  #    sv3m gives 1.0932. The perfect-flavour ceiling is beaten 3x already.
+  #
+  # What it IS: at fixed flavour AND fixed conePt, ttbar's true fake rate sits
+  # 12-17% below QCD's for b-jets (conePt 20-30: 0.1645 vs 0.1368). A QCD b-jet
+  # comes from gluon splitting, a ttbar b-jet from top decay. sv3m recovers ~2/3
+  # of that through continuous jet structure, which is exactly why it beats the
+  # flavour ceiling — and the arm sequence is monotone in structural detail:
+  # sv0 1.244 -> +sv_masssum 1.181 -> +jet_nconst 1.114 -> +ch/ne mult 1.093.
+  #
+  # So the lever still working is more structure. Which variable, chosen by
+  # measurement rather than by guess: among b-flavour muons at conePt 20-30, the
+  # median in QCD vs ttbar of every unused jet-structure variable —
+  #   mu_jetNDauCharged  2.00 -> 3.00   (1.50x)   <- the only large one
+  #   jet_neEmEF        0.060 -> 0.063  (1.07x)
+  #   jet_chHEF         0.217 -> 0.221  (1.02x)
+  #   jet_muEF, jet_nmuons, jet_area, jet_ptrel, jet_ptratio, jet_dr_mu  <=1.01x
+  #
+  # mu_jetNDauCharged also has a property nothing else here has: it is a NanoAOD
+  # *Muon* branch, so it is defined even when Muon_jetIdx < 0 — the one category
+  # (3.9% of ttbar truth, ratio 1.632) where every jet_* and sv_* input is NaN.
+  # It therefore attacks the b term and the jet-less term at once.
+  #
+  # Rule check (§4i): both arms are local to the muon and its jet (Rule 2), and
+  # neither carries a function of MiniPFRelIso or SIP3D (Rule 1).
+  # mu_jetNDauCharged is the same class of local-activity count as jet_nconst
+  # and jet_chmult, which are already inputs.
+  sv16:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult, mu_jetNDauCharged]
+    categorical: [era]
+  # sv17 is the control for the two energy fractions: their marginal value gets
+  # measured instead of assumed. The study's pattern is that weakly separating
+  # additions COST transfer (sv2, sv4, sv7 all did), so a null result here is
+  # the expected one and keeps sv16 as the answer.
+  sv17:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult, mu_jetNDauCharged,
+                jet_neEmEF, jet_chHEF]
+    categorical: [era]
+
+  # ---- ev_ht: the one untried configuration ---------------------------------
+  #
+  # Everything else that could close the QCD->ttbar residual has been measured
+  # and closed (RESULTS §4h): flavour information (a perfect truth-flavour map
+  # gives 1.2098, worse than sv3m's 1.0932), SV b/c discriminants (93% of the c
+  # excess is in c-jets with NO vertex, ceiling 0.22 pts), a dR jet-matching
+  # fallback (0.92% recovery), nine local variables for the jet-less category
+  # (FR_tt/FR_qcd flat at 0.43-0.55 in every bin of all of them), and
+  # mu_jetNDauCharged (sv16, which made every targeted term worse).
+  #
+  # What the residual IS: at fixed flavour AND fixed conePt, ttbar's true fake
+  # rate sits below QCD's. Conditioning additionally on HT closes it —
+  # ttbar-weighted FR_tt/FR_qcd, b (R2 | R3) and jet-less (R3):
+  #     conePt            0.887 | 0.849    0.536
+  #     conePt x N_jet40  0.926 | 0.905    0.753
+  #     conePt x HT       0.942 | 0.939    1.020
+  #
+  # Activity was then tried three ways as an ESTIMATOR and all three transferred
+  # worse (map + HT axis, map + N_jet axis, and measuring QCD only at HT > 120).
+  # But `ev_ht` has never been a neural INPUT — only ev_njet40, and N_jet is
+  # visibly the weaker of the two above. So this settles the last route.
+  #
+  # Numerical, not categorical: HT is continuous, and this is how paper5 treated
+  # MET and M_T, so the comparison against that arm stays clean. ev_ht has 0%
+  # missing in all four parquets, so no `__isnan` indicator appears.
+  #
+  # Rule check (§4i): this violates Rule 2 (inputs local to the muon and its
+  # jet) DELIBERATELY — Rule 2 is what is being tested. Rule 1 (no function of
+  # MiniPFRelIso or SIP3D) is untouched.
+  #
+  # Expect the answer to be ambiguous a priori, which is why it is run rather
+  # than argued. For: QCD is not blind at high HT by ROW count (unweighted
+  # median 249). Against: by WEIGHT — what the loss and the closure sum use —
+  # QCD is median 56 / p99 248 while ttbar is median 179-201 / p90 373-404, so
+  # half of ttbar sits above QCD's ~96th percentile.
+  sv3h:      # Run 2 pairing: sv3 + HT
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, ev_ht]
+    categorical: [era]
+  sv3mh:     # Run 3 pairing: sv3m + HT
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult, ev_ht]
+    categorical: [era]
+
+  # ---- log(HT): the encoding control for sv3h / sv3mh ----------------------
+  #
+  # sv3h / sv3mh showed ev_ht is the first variable in the study to improve the
+  # transfer (mean |per-flavour error| -34% Run 2, -12% Run 3), but well short
+  # of the ceiling the conditioning table implies (jet-less 1.020 available,
+  # 1.499 reached). The suspect is the encoding, not the physics: ev_ht is
+  # winsorized on UNWEIGHTED rows, where QCD's HT is dominated by high-pT slices
+  # carrying almost no weight, so the physical range is squeezed flat.
+  #
+  # Measured z-span of HT 56 -> 404 (QCD weighted median -> ttbar weighted p90):
+  #     raw, clip_quantile 0.999   0.57    <- what sv3h/sv3mh used
+  #     raw, clip 0.99 / 0.95 / 0.90   0.58 / 0.62 / 0.70
+  #     log1p(HT), clip 0.999      1.63
+  # So a tighter clip is NOT the fix — the unweighted distribution is genuinely
+  # broad, not outlier-driven — and the log is. `log_ev_ht` is derived in
+  # data.column(); no parquet changes.
+  sv3hl:     # Run 2: sv3 + log(HT)
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, log_ev_ht]
+    categorical: [era]
+  sv3mhl:    # Run 3: sv3m + log(HT)
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult, log_ev_ht]
+    categorical: [era]
+
+  # ---- the c arms: a b/c handle that survives a missing vertex -------------
+  #
+  # The problem these exist for, measured. The binned map over-predicts
+  # c-flavour fakes by 1.455 (integrated over c's own fail-region kinematics in
+  # QCD) and `sv3` does NOT fix it: 1.484 in QCD, its own training sample, and
+  # 1.47 -> 1.61 in the DY trilepton closure. The arm assigns b and c almost the
+  # same fake factor -- <F> 0.328 vs 0.334 -- where the truth is 0.366 vs 0.225.
+  #
+  # Why it cannot do better: `sv_masssum` is its only b/c handle, and only
+  # 10.9% of c-fakes have a reconstructed secondary vertex (b: 39.8%). For the
+  # other 89% sv_masssum is 0 and the arm is blind. Split by SV presence, the
+  # arm's c ratio is 1.721 where a vertex exists (map 2.738 -- a big repair) and
+  # 1.470 where it does not (map 1.377 -- no repair at all), and the no-SV
+  # bucket is 23.0% of all QCD fakes.
+  #
+  # It is worth fixing: a QCD FR measured in (conePt, |eta|, TRUTH flavour)
+  # cells and applied to TTLJ gives c 0.996 and c-no-SV 1.012, against 1.394 /
+  # 1.327 flavour-blind. f_c transfers -- c only has to be resolved.
+  #
+  # Which variable, from an FR scan restricted to `flavor == 1 & sv_n == 0`
+  # (deck_figs --fr-scan --fr-scan-select, plots/fr_scan_c_nosv/). Scored on the
+  # same two numbers that chose sv3's inputs -- information = population-
+  # weighted RMS of f(x) about the inclusive f, transfer = max/min of
+  # f(ttbar)/f(QCD) on the cell-matched ttbar:
+  #
+  #   mu_jetPtRelv2   info 60.8%   transfer 1.16     <- 1.6x jet_nconst's info
+  #   jet_ptrel       info 40.1%   transfer 1.09     <- best transfer in the set
+  #   jet_nconst      info 39.1%   transfer 1.12     (sv3's baseline)
+  #
+  # Rule 1 check, by the study's own metric and threshold (Spearman against the
+  # two variables that DEFINE tight; mu_ip3d 0.62 and mu_miniiso_neu 0.72 are
+  # the registered near-leaks, 0.37 is the line). Rank, not Pearson: three
+  # candidates flip verdict between the two, and the miniiso tail is what does
+  # it.
+  #   mu_jetPtRelv2  0.219 / 0.012   CLEAN -- cleaner than jet_nconst (0.350),
+  #                                  which sv3 already trains on
+  #   jet_ptrel      0.109 / 0.025   CLEAN -- cleanest in the whole candidate set
+  # Rejected above them, each for a measured reason rather than a guess:
+  # mu_pfiso04 0.561, mu_jetRelIso 0.466, jet_muEF / jet_muonSubtr /
+  # jet_ptratio ~0.37-0.43 -- the whole "muon's share of the jet" family reads
+  # isolation back. deck_figs.FR_WP_PROXY carried mu_jetPtRelv2 as an exclusion
+  # with NO measured number behind it; that entry is now retired.
+  #
+  # Physics: pTrel is the muon momentum transverse to the jet axis, set by the
+  # parent hadron mass (m_B 5.28 vs m_D 1.87 GeV). Isolation is the scalar
+  # energy sum around the muon. Geometrically different quantities, which is why
+  # the correlation is low and why pTrel is the classic no-vertex b/c tool.
+  #
+  # Rule 2 check: both are properties of the muon and its own jet. Untouched.
+  #
+  # `mu_jetPtRelv2` and `jet_ptrel` are NOT the same variable (|r| 0.591): the
+  # first is the NanoAOD Muon branch, the second is computed in fake.cc from the
+  # matched jet. That difference has a consequence -- jet_ptrel is NaN when no
+  # jet is matched (Run 2 QCD 2.3%, but Run 3 QCD 13.3% and Run 3 DY 18.5%,
+  # inheriting the corrupted Run 3 jet collection), while mu_jetPtRelv2 is never
+  # NaN. So expect sv3mr / sv3mpr to lose to sv3mp in Run 3. That is a result to
+  # report, not a reason to skip them.
+  #
+  # Both are nearly orthogonal to what sv3 already carries (|r| with jet_nconst:
+  # 0.249 and 0.225 in the non-SV c population), so they add a degree of freedom
+  # rather than a second view of one. `jet_mass` was rejected for the opposite
+  # reason: 0.730 with jet_nconst and 0.725 with conePt, already carried.
+  #
+  # Each arm is a strict SUPERSET of sv3 / sv3m, so every comparison has exactly
+  # one moving part. The `m` infix is the Run 3 twin, as in sv3h / sv3mh.
+  sv3p:      # Run 2: sv3 + mu_jetPtRelv2
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, mu_jetPtRelv2]
+    categorical: [era]
+  # jet_dr_mu alone (2026-10-13). Until now only tested inside sv10, together with
+  # sv_ptratio. Rule 1: |rho| 0.153 with miniIso and 0.018 with |SIP3D|, cleaner
+  # than jet_nconst (0.349). Analysis-tight plane: information 30.0%, ttbar spread
+  # 1.066 (mu_jetPtRelv2 1.259). svdr drops jet_nconst, which transfers worst to DY;
+  # it is the DY arm.
+  sv3dr:     # Run 2: sv3 + jet_dr_mu (the ttbar arm)
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, jet_dr_mu]
+    categorical: [era]
+  svdr:      # Run 2: sv3 with jet_nconst -> jet_dr_mu (the DY arm)
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_dr_mu]
+    categorical: [era]
+  sv3r:      # Run 2: sv3 + jet_ptrel
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, jet_ptrel]
+    categorical: [era]
+  sv3pr:     # Run 2: sv3 + both
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                mu_jetPtRelv2, jet_ptrel]
+    categorical: [era]
+
+  # ---- the n arms (2026-09-08). `n` = mu_jetNDauCharged, picked off the DY
+  # selection plane: information 41.8% with transfer spread 1.325 to DY, the
+  # best-transferring informative variable there (jet_nconst 1.457,
+  # sv_masssum 1.460, mu_jetPtRelv2 1.546, jet_deepjet_cvl 1.689).
+  #
+  # sv3n exists so the effect can be ATTRIBUTED: sv3r (sv3 + jet_ptrel) is
+  # already trained, so sv3 -> sv3n -> sv3nr says which of the two variables
+  # did the work. Without it sv3nr vs sv3 is one number and two causes.
+  #
+  # WARNING, recorded before the jobs were spent: on the RUN 3 plane
+  # mu_jetNDauCharged has the worst transfer of anything measured -- spread
+  # 2.109 to ttbar, 1.600 to DY. The Run 3 twins are predicted to transfer
+  # WORSE than sv3m. They are trained anyway so the prediction is tested.
+  sv3n:      # Run 2: sv3 + mu_jetNDauCharged
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, mu_jetNDauCharged]
+    categorical: [era]
+  sv3nr:     # Run 2: sv3 + mu_jetNDauCharged + jet_ptrel
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                mu_jetNDauCharged, jet_ptrel]
+    categorical: [era]
+  sv3mn:     # Run 3 twin of sv3n
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult, mu_jetNDauCharged]
+    categorical: [era]
+  sv3mnr:    # Run 3 twin of sv3nr
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult, mu_jetNDauCharged, jet_ptrel]
+    categorical: [era]
+  sv3mp:     # Run 3: sv3m + mu_jetPtRelv2
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult, mu_jetPtRelv2]
+    categorical: [era]
+  sv3mr:     # Run 3: sv3m + jet_ptrel
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult, jet_ptrel]
+    categorical: [era]
+  sv3mpr:    # Run 3: sv3m + both
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult, mu_jetPtRelv2, jet_ptrel]
+    categorical: [era]
+
+  # ---- the c-tagger arms ---------------------------------------------------
+  #
+  # `jet_deepjet_cvl` is DeepJet's c-vs-light discriminant, and it is the
+  # HIGHEST-information variable in the entire scan: 52.6% (Run 2) and 66.2%
+  # (Run 3) against `jet_nconst`'s 41.5 / 50.3. It is also the only route in
+  # NanoAOD to the displacement information that lives BELOW the SV
+  # reconstruction threshold, which is exactly where the c problem is -- 89% of
+  # c-flavour fakes have no reconstructed vertex, and DeepJet uses track impact
+  # parameters and vertex candidates that never become an `SV_*` entry.
+  #
+  # It is an ML output fed to an ML input, which the study had avoided on
+  # principle. Rule 1 is untouched (it is not a function of MiniPFRelIso or
+  # SIP3D) and Rule 2 is untouched (it is a property of the muon's own jet).
+  #
+  # **Run this expecting it to fail.** Its inclusive transfer spread is
+  # 1.19 (Run 2) / 1.21 (Run 3), which is worse than sv3's own inputs
+  # (1.12 / 1.12 and 1.10 / 1.30) and sits in the SAME band as `jet_ptrel`
+  # (1.19 / 1.17), which broke the arm in both runs (§4n). By the criterion
+  # that has now called 6 of 6 outcomes correctly, this one fails too.
+  #
+  # It is trained anyway because the criterion has n = 2 and the physics
+  # differs: p_T^rel failed through a PRODUCTION-mechanism dependence -- a QCD
+  # b-jet from gluon splitting against a ttbar b-jet from top decay -- while a
+  # flavour tagger is built to answer "what hadron is this" as
+  # process-independently as possible. Whether that survives the transfer is a
+  # measurement, not an argument, and one arm settles it.
+  #
+  # `cvb` is deliberately NOT here: its transfer is 1.37 in Run 2, far outside
+  # the band, so pairing it with cvl would confound the test.
+  sv3c:      # Run 2: sv3 + the c-vs-light tagger
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, jet_deepjet_cvl]
+    categorical: [era]
+  sv3mc:     # Run 3: sv3m + the c-vs-light tagger
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst,
+                jet_chmult, jet_nemult, jet_deepjet_cvl]
+    categorical: [era]
+
+  # ---- bc4: the pure-tagger arm ------------------------------------------
+  #
+  # The first arm in the study that is NOT a superset of sv3. It is a superset
+  # of `sv0` -- the binned map's own two axes -- plus flavour information and
+  # nothing else: no vertex, no multiplicity, no pTrel. `sv0` is therefore the
+  # control it must be read against, not sv3.
+  #
+  # Motivation: the map's c over-prediction (~1.43) is a flavour-blindness
+  # failure -- a 62%-b population's fake rate applied to c jets. So hand the
+  # network the two numbers that answer "what hadron is this" and see whether
+  # that alone fixes c. If it does not, the c residual is not a
+  # flavour-information problem and no amount of tagger input will move it.
+  #
+  # Both inputs are measured usable by this study's own two criteria
+  # (plots/fr_scan_tagger/fr_scan.npz, ranked by context/rank_scan.py):
+  #
+  #   feature           info %  R2 / R3    transfer  R2 / R3
+  #   mu_conept          53.7 / 38.8        1.12 / 1.14
+  #   jet_deepjet_b      44.3 / 52.6        1.19 / 1.15
+  #   jet_deepjet_cvl    52.6 / 66.2        1.19 / 1.21
+  #
+  # Rule 1 holds (neither tagger is a function of MiniPFRelIso or SIP3D, the
+  # two variables that define tight) and Rule 2 holds (both are properties of
+  # the muon's own jet). They are ML outputs fed as ML inputs, which the study
+  # had avoided on principle; sv3c already crossed that line deliberately.
+  #
+  # `jet_deepjet_cvb` is NOT here: 1.37 transfer spread in Run 2, the worst of
+  # the three taggers, and jet_deepjet_b already carries the b-vs-c axis.
+  #
+  # PASS CRITERION, fixed before the measurement: judge bc4 on **c's Exp/Obs
+  # and the mean |error| across flavours**, NOT on the inclusive ratio. The
+  # inclusive ratio is where sv3 wins by b/c cancellation, which is the
+  # accident this arm exists to stop relying on. By the transfer-spread
+  # criterion the inclusive number should get WORSE (two 1.19 inputs in place
+  # of sv3's 1.12s) -- that is expected and is not the answer to the question.
+  #
+  # No Run-3 twin name: bc4 uses no Run-3-only feature, so one definition
+  # trains against both parquets (nff_qcd_bc4, nff_qcd3_bc4), as sv10 does.
+  # Trained with an explicit `--reg-lambda 0`; see the WARNING under `train`.
+  bc4:
+    numerical: [mu_conept, mu_abseta, jet_deepjet_b, jet_deepjet_cvl]
+    categorical: [era]
+
+  sv0j:
+    numerical: [mu_conept, mu_abseta]
+    categorical: [ev_njet40, era]
+  sv1j:
+    numerical: [mu_conept, mu_abseta, sv_masssum]
+    categorical: [ev_njet40, era]
+  sv2j:
+    numerical: [mu_conept, mu_abseta, sv_masssum, sv_dr_jet, sv_pangle]
+    categorical: [ev_njet40, era]
+  sv3j:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst]
+    categorical: [ev_njet40, era]
+  sv4j:
+    numerical: [mu_conept, mu_abseta, sv_masssum, sv_dr_jet, sv_pangle, jet_nconst]
+    categorical: [ev_njet40, era]
+  sv5j:
+    numerical: [mu_conept, mu_abseta, jet_nconst]
+    categorical: [ev_njet40, era]
+  sv6j:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, sv_dr_jet]
+    categorical: [ev_njet40, era]
+  sv7j:
+    numerical: [mu_conept, mu_abseta, sv_masssum, sv_dr_jet]
+    categorical: [ev_njet40, era]
+
+features:
+  # Values above this are clipped into the last category rather than creating a
+  # bin with three events in it.
+  njet_max: 6
+  # Winsorization quantile for the numerical features, fitted on the training
+  # split. Required once the MET/MT cut is off the ntuple: PUPPI MET has a
+  # pathological tail (max 1.0e7 GeV over the full QCD sample) that
+  # standardization cannot survive. Rows are clipped, never dropped, so they
+  # keep their weight in the loss and in the closure sum.
+  #
+  # 0.999, not 0.9999: the pathological tail is thick enough that the 0.9999
+  # quantile of ev_met is still 9.9 TeV, which leaves std = 134 and squeezes the
+  # 1-99% bulk into a z-span of 2.6. At 0.999 the cut is 690 GeV, std = 66, and
+  # the bulk spans 5.4 — twice the resolution where all the events are. 690 GeV
+  # is a generous physical ceiling for MET in a QCD fake-rate region, and f is
+  # flat out there anyway. conePt and mT are insensitive to the choice.
+  clip_quantile: 0.999
+
+model:
+  embed_dim: 32          # per-feature embedding width, mean-pooled to this
+  hidden_dim: 128        # paper: 128 neurons per layer
+  n_blocks: 4            # paper: four residual blocks
+  norm: none             # paper found BatchNorm did not help; 'batch' to re-enable
+  head: linear           # ratio classifier; 'softabs' is the subtraction head
+
+train:
+  seed: 42
+  device: cuda
+  # Paper: 50 / 25 / 25 train / val / test.
+  test_size: 0.25
+  val_size: 0.3333333333    # of the remaining 75% -> 25% of the total
+  split_by_event: true
+  batch_size: 1024
+  epochs: 100
+  lr: 3.0e-4
+  weight_decay: 1.0e-5
+  # Eq. 12's squared term on the logit. The paper writes it with a minus sign,
+  # which under minimization would *reward* exploding logits; implemented as a
+  # penalty. 0.01 for the ratio classifier, 0 for the subtraction ones.
+  # WARNING (2026-09-06): every arm in the study — sv3, sv3m, sv10, sv6, sv4,
+  # paper5 — was trained at reg_lambda 0, NOT at this default. Training a new
+  # arm at 0.01 and comparing it against them is not a controlled comparison:
+  # measured at fixed features (sv3), 0 -> 0.01 moves test_closure 1.0007 ->
+  # 1.0790 and the QCD->TTLJ matrix ratio 0.9954 -> 1.2267. Pass
+  # `--reg-lambda 0` unless you specifically want the paper's Eq. 12 value.
+  # `bc4` (2026-09-07) was likewise trained with an explicit --reg-lambda 0.
+  # The default is left at the paper's number rather than silently changed.
+  reg_lambda: 0.01
+  lr_patience: 5         # ReduceLROnPlateau, factor 0.5
+  early_stopping_patience: 15
+
+# Binning of the reference map. Must stay identical to fake.cc's ptCorrBins /
+# absEtaBins and to the edges inside fr/fakerate_muon_*.json.
+binning:
+  pt_col: axis_c2d
+  ptcorr: [10., 12., 14., 17., 20., 30., 50., 100.]
+  abseta: [0., 0.9, 1.6, 2.4]
+  # What to do with conePt > 100.
+  #
+  # `drop` is REQUIRED to reproduce fr/*.json, and this was measured, not
+  # assumed: with the overflow clipped into [50,100] the last bin comes out
+  # 0.0584 / 0.0733 / 0.1083 against the official 0.0576 / 0.0725 / 0.1075
+  # (+1.4 / +1.1 / +0.7%), and dropping it reproduces all three to four
+  # decimals — while the other 18 bins agree exactly either way.
+  #
+  # Note this DISAGREES with fake.cc, which fills its histograms with
+  # min(ptCorr, 99.9) and therefore does put the overflow in the last bin. The
+  # reference maps predate that behaviour. `clip` reproduces the analyzer;
+  # `drop` reproduces the thing we are comparing against, so it is the default.
+  # It affects the binned baseline and the ML projection identically — both use
+  # the same cell assignment — and never affects training, which keeps every row.
+  overflow: clip
+
+compare:
+  # Official binned maps to overlay, by sample.
+  official_json: null
+  official_name:
+    QCD_MuEnriched: fakerate_muon_QCD_MuEnriched
+    TTLJ: fakerate_muon_TT
+  # Keys quoted deliberately: unquoted 2017/2018 are parsed as ints and the
+  # lookup by era string misses. compare.py now coerces both sides anyway.
+  # Run 3 maps are the official ones too, copied out of
+  # aa/SKNanoAnalyzer/data/Run3_v13_Run2_v9/<era>/MUO/fakerate_TopHNT.json —
+  # same correction name, same (absEta, ptCorr) edges, same flow: clamp as
+  # Run 2, so nothing downstream needs to know which run it is looking at.
+  era_tag: {"2016preVFP": "2016pre", "2016postVFP": "2016post",
+            "2017": "2017", "2018": "2018",
+            # Run 3 points at OUR maps (fakerate_muon_<era>_ours.json), not the
+            # official ones. The published Run 3 maps were produced with
+            # corrupted jet multiplicities (RESULTS.md 4g: a uint8 branch bound
+            # to a 4-byte array, so only jet 0 survives), which changes the jet
+            # collection and therefore the measurement. Comparing the closure
+            # against them would measure that bug rather than our method.
+            # Run 2 keeps the official maps: those branches do not exist there,
+            # and we reproduce them to 0.0000% in 21/21 cells of all four eras.
+            "2022": "2022_ours", "2022EE": "2022EE_ours",
+            "2023": "2023_ours", "2023BPix": "2023BPix_ours"}
+
+# Run 3 ID-case tight (see header). data.py::apply_label / closure_root's
+# trilepton label block read it; the loose side is the tree's.
+label:
+  name: isTight
+  all:
+    - [mu_miniiso, "<", 0.1]
