@@ -1,4 +1,7 @@
 # Run 3 ID-case study, case 1 (2026-10-30) -- plots/idcase/run3_*.
+# ALSO RUN 2 (2026-10-31): the same config trains nff_qcd2ns_sv3.pt on the Run 2 twin
+# production (fake.sh block r2id, tag nff2ns, parquet fakeflavor/data/ntuples_nff2ns/);
+# Run 2's loose reaches this WP through MatchWP. The config carries no run.
 #
 #   loose = POG Medium + |dZ| < 0.1 + TkRelIso < 0.4 + miniIso < 0.4   (NO SIP3D)
 #   tight = the same + miniIso < 0.1                                    (NO SIP3D)
@@ -103,6 +106,12 @@ feature_sets:
     categorical: [era]
   sv3:
     numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst]
+    categorical: [era]
+  # sv3 with conePt -> RAW muon pT (2026-11-02, Run 2/3 ID cases). Never both: their ratio
+  # is the cone correction, i.e. miniIso, which is in case 1/2's tight. The binned map
+  # stays on conePt. Raw pT is what the Run 3 jet loss turns off at (20 GeV).
+  sv3pt:
+    numerical: [mu_pt, mu_abseta, sv_masssum, jet_nconst]
     categorical: [era]
   # sv3 minus sv_masssum: jet_nconst alone on top of the map's axes. Added
   # 2026-09-25 to split sv3's two inputs in the SIP-only / iso-only label study

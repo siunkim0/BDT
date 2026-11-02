@@ -1,0 +1,53 @@
+# RUN 2 twin of samples_nff3ns.yaml (fake.sh block r2id, 2026-10-31): the same WP,
+# `fake --userflags MakeTree,MatchWP,LooseNoSIP --tag nff2ns`. Run 2's default loose is
+# SIP3D < 5 & miniIso < 0.6, so every Run 2 case carries MatchWP (miniIso 0.4)
+# underneath; the result is the same loose WP as the Run 3 case. Model config:
+# the same neuralff/config/nff3_*.yaml, models nff_qcd2ns_sv3.pt (no sv3m: the jet
+# multiplicities do not exist in Run 2 NanoAODv9).
+#
+#   $V -m fakeflavor.skim --config fakeflavor/config/samples_nff2ns.yaml \
+#       --out fakeflavor/data/ntuples_nff2ns --keep-all-flavors
+#
+# Run 3 ID-case study, case 1 — `fake --userflags MakeTree,LooseNoSIP --tag nff3ns`
+# (SKNanoAnalyzer fake.sh, block `r3id`, 2026-10-30). Same producer, eras and MC
+# groups as samples_nff3r2.yaml; only ntuple_root and tag differ (a userflag makes
+# a directory level, SKNano.py:426).
+#
+#   all cases: POG Medium + |dZ| < 0.1 + TkRelIso < 0.4, and
+#   loose miniIso < 0.4, NO SIP3D        | tight (offline label) miniIso < 0.1
+#
+# Why a production and not an offline cut: cases 1 and 3 WIDEN the Run 3 loose
+# (SIP3D < 8 & miniIso < 0.4 on disk), and fake.cc requires EXACTLY ONE loose muon,
+# so even a tightening changes which events enter. Case 2 is re-produced as well so
+# that all three cases share one code vintage (ntuples_nff3 predates the Run 3
+# loader fix). Model config: neuralff/config/nff3_nosip.yaml. conePt keeps the tree definition
+# pt * (1 + max(0, miniIso - 0.1)) in every case.
+#
+
+ntuple_root: /gv0/Users/snuintern2/SKNanoOutput/fake/MakeTree_MatchWP_LooseNoSIP
+
+eras:
+  - "2016preVFP"
+  - "2016postVFP"
+  - "2017"
+  - "2018"
+
+tag: nff2ns
+
+tree: mu
+stitch:
+  pt_col: mu_conept
+  paths:
+    - {name: Mu8,  pass: pass_mu8,  weight: w_mu8, upto: 30.0}
+    - {name: Mu17, pass: pass_mu17, weight: w_mu17}
+
+mc:
+  QCD_MuEnriched:
+    glob: "QCD_Pt-*_MuEnriched.root"
+  TTLJ:
+    glob: "TTLJ_powheg.root"
+
+# Same as the Run 2/Run 3 configs: MC has gen truth, so the paper's two
+# subtraction classifiers have nothing to subtract. Left empty rather than
+# deleted so `skim.py --data` fails loudly instead of silently doing nothing.
+data: {}
