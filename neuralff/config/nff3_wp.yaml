@@ -113,6 +113,20 @@ feature_sets:
   sv3pt:
     numerical: [mu_pt, mu_abseta, sv_masssum, jet_nconst]
     categorical: [era]
+  # sv3 + the muon's transverse IP uncertainty sigma(dxy) = Muon_dxyErr (2026-11-02).
+  # For a SIP3D tight (cases 2/3) a mild label ingredient (it tracks sigma(IP3D)).
+  sv3sdxy:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, mu_dxyerr]
+    categorical: [era]
+  # sv3 + event activity (2026-11-03): N jets with pT > 25 (lepton-cleaned tight jets, the
+  # fake.cc ev_njet25; closnff ev_njet25 since tag closdyh*), alone and with HT (sv3h above).
+  # Numerical, not categorical: an unseen high multiplicity must not hit the last embedding.
+  sv3nj:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, ev_njet25]
+    categorical: [era]
+  sv3hnj:
+    numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, ev_ht, ev_njet25]
+    categorical: [era]
   # sv3 minus sv_masssum: jet_nconst alone on top of the map's axes. Added
   # 2026-09-25 to split sv3's two inputs in the SIP-only / iso-only label study
   # (nff_sipwp.yaml / nff_isowp.yaml): which one carries the SIP3D (lifetime)
@@ -476,6 +490,13 @@ feature_sets:
     categorical: [era]
   svdr:      # Run 2: sv3 with jet_nconst -> jet_dr_mu (the DY arm)
     numerical: [mu_conept, mu_abseta, sv_masssum, jet_dr_mu]
+    categorical: [era]
+  # 2026-11-03 DY-arm scan (case 2): sv1 + one more input, still without jet_nconst
+  sv1h:      # sv1 + HT (pT > 25 jets)
+    numerical: [mu_conept, mu_abseta, sv_masssum, ev_ht]
+    categorical: [era]
+  sv1p:      # sv1 + mu_jetPtRelv2
+    numerical: [mu_conept, mu_abseta, sv_masssum, mu_jetPtRelv2]
     categorical: [era]
   sv3r:      # Run 2: sv3 + jet_ptrel
     numerical: [mu_conept, mu_abseta, sv_masssum, jet_nconst, jet_ptrel]
